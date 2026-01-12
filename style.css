@@ -1,0 +1,21 @@
+body {
+    margin: 0;
+    overflow: hidden; /* Remove barras de rolagem */
+    background-color: #000;
+}
+canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+}
+#uiContainer {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 2;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 10px;
+    border-radius: 5px;
+    color: white;
+    font-family: monospace;
+}
