@@ -50,16 +50,19 @@ function main() {
     divisions: 30,     // Pontos horizontais (fatias)
     // Parâmetros de Animação
     rotatingSpeed: 50, // Velocidade de rotação
-    // Parâmetros do Terreno (Preparo para Sessão 2 - Próxima etapa)
-    // noiseScale: 1.0,
-    // terrainAmplitude: 0.5,
-    // waterLevel: 0.2,
+    // Parâmetros do Terreno
+    noiseType: "perlin",
+    noiseScale: 1.0,
+    noiseAmplitude: 0.5,
+    waterLevel: 0.2,
   };
 
   const cameraData = {
     radius: 5,
     fov: 45,
   };
+
+  const noise = new Noise();
 
   // --- FUNÇÃO LATHE (Gira o perfil para criar 3D) ---
   function lathePoints(points,
@@ -123,6 +126,22 @@ function main() {
       }
     }
 
+    for (let i = 0; i < positions.length; i = i + 3) {
+      const position = [positions[i], positions[i + 1], positions[i + 2]];
+      const normal = twgl.v3.normalize(position);
+      const calculatedNoise = noise.calcNoise(
+        planetSphereData.noiseType,
+        normal[0],
+        normal[1],
+        normal[2],
+        planetSphereData.noiseScale
+      );
+      const displacement = calculatedNoise * planetSphereData.noiseAmplitude;
+      positions[i] += normal[0] * displacement;
+      positions[i + 1] += normal[1] * displacement;
+      positions[i + 2] += normal[2] * displacement;
+    }
+
     return {
       position: positions,
       texcoord: texcoords,
@@ -181,8 +200,6 @@ function main() {
     }
     render();
   }
-  
-  update();
 
   function render(time) {
     if(time) time *= 0.001;
@@ -254,6 +271,8 @@ function main() {
   function lerp(a, b, t) {
     return a + (b - a) * t;
   }
+
+  update();
 }
 
 main();
