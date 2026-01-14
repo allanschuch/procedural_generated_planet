@@ -48,12 +48,13 @@ function main() {
     // Parâmetros da Malha (Sessão 1)
     resolution: 20,    // Pontos verticais (perfil)
     divisions: 30,     // Pontos horizontais (fatias)
+    radius: 1.0,        // Raio da esfera
     // Parâmetros de Animação
     rotatingSpeed: 50, // Velocidade de rotação
     // Parâmetros do Terreno
     noiseType: "perlin",
     noiseScale: 1.0,
-    noiseAmplitude: 0.5,
+    noiseAmplitude: 0.2,
     waterLevel: 0.2,
   };
 
@@ -153,12 +154,11 @@ function main() {
   // --- GERA PERFIL DA ESFERA ---
   function getSpherePoints(numPoints) {
       const points = [];
-      const radius = 1.0; 
       for (let i = 0; i < numPoints; i++) {
           const t = i / (numPoints - 1);
           const angle = (Math.PI / 2) - (t * Math.PI); 
-          const x = Math.cos(angle) * radius;
-          const y = Math.sin(angle) * radius;
+          const x = Math.cos(angle) * planetSphereData.radius;
+          const y = Math.sin(angle) * planetSphereData.radius;
           points.push([x, y]);
       }
       return points;
@@ -239,14 +239,18 @@ function main() {
 
   // --- UI: Conectada ao planetSphereData ---
   webglLessonsUI.setupUI(document.querySelector("#ui-planet"), planetSphereData, [
-    { type: "slider", key: "resolution", change: update, min: 5, max: 100, precision: 0 },
-    { type: "slider", key: "divisions", change: update, min: 3, max: 100, precision: 0 },
-    { type: "slider", key: "rotatingSpeed", change: update, min: 1, max: 200, precision: 0 },
+    { type: "slider", key: "resolution", change: update, min: 5, max: 100, precision: 0, name: "Resolution" },
+    { type: "slider", key: "divisions", change: update, min: 3, max: 100, precision: 0, name: "Divisions" },
+    { type: "slider", key: "radius", change: update, min: 0.5, max: 5.0, precision: 2, step: 0.1, name: "Radius" },
+    { type: "slider", key: "rotatingSpeed", change: update, min: 1, max: 200, precision: 0, name: "Rotating Speed" },
+    { type: "slider", key: "noiseScale", change: update, min: 0.1, max: 10.0, precision: 2, step: 0.1, name: "Noise Scale" },
+    { type: "slider", key: "noiseAmplitude", change: update, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Noise Amplitude" },
+    { type: "slider", key: "waterLevel", change: update, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Water Level" },
   ]);
 
   webglLessonsUI.setupUI(document.querySelector("#ui-camera"), cameraData, [
     { type: "slider", key: "radius", change: update, min: 2, max: 20, precision: 1, step: 0.1, name: "Camera Radius" },
-    { type: "slider", key: "fov", change: update, min: 10, max: 120, precision: 0 },
+    { type: "slider", key: "fov", change: update, min: 10, max: 120, precision: 0, name: "Field of View" },
   ]);
 
   function loadImageAndCreateTextureInfo(url, callback) {
