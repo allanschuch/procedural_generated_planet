@@ -132,15 +132,15 @@ function main() {
       const normal = twgl.v3.normalize(position);
       const calculatedNoise = noise.calcNoise(
         planetSphereData.noiseType,
-        normal[0],
-        normal[1],
-        normal[2],
+        position[0],
+        position[1],
+        position[2],
         planetSphereData.noiseScale
       );
-      const displacement = calculatedNoise * planetSphereData.noiseAmplitude;
-      positions[i] += normal[0] * displacement;
-      positions[i + 1] += normal[1] * displacement;
-      positions[i + 2] += normal[2] * displacement;
+      const newRadius = planetSphereData.radius + calculatedNoise * planetSphereData.noiseAmplitude;
+      positions[i] = normal[0] * newRadius;
+      positions[i + 1] = normal[1] * newRadius;
+      positions[i + 2] = normal[2] * newRadius;
     }
 
     return {
