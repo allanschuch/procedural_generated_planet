@@ -90,10 +90,16 @@ class PerlinAlgorithm {
 }
 
 class RandomAlgorithm {
+    constructor() {
+        this.table = [];
+        for(let i = 0; i < 256; i++) {
+            this.table.push( (Math.random() * 2) - 1 ); 
+        }
+    }
+
     random(x, y, z) {
-        const dot = x * 12.9898 + y * 78.233 + z * 37.719;
-        const sinVal = Math.sin(dot) * 43758.5453;
-        return (sinVal - Math.floor(sinVal)) * 2.0 - 1.0; 
+        let index = Math.floor(Math.abs(x * 13 + y * 29 + z * 47)) % 256;
+        return this.table[index];
     }
 }
 

@@ -52,9 +52,10 @@ function main() {
     // Parâmetros de Animação
     rotatingSpeed: 50, // Velocidade de rotação
     // Parâmetros do Terreno
-    noiseType: "perlin",
+    noiseType: "random",
     noiseScale: 1.0,
     noiseAmplitude: 0.2,
+    numberOfNoisePasses: 1,
     waterLevel: 0.2,
   };
 
@@ -127,22 +128,6 @@ function main() {
       }
     }
 
-    for (let i = 0; i < positions.length; i = i + 3) {
-      const position = [positions[i], positions[i + 1], positions[i + 2]];
-      const normal = twgl.v3.normalize(position);
-      const calculatedNoise = noise.calcNoise(
-        planetSphereData.noiseType,
-        position[0],
-        position[1],
-        position[2],
-        planetSphereData.noiseScale
-      );
-      const newRadius = planetSphereData.radius + calculatedNoise * planetSphereData.noiseAmplitude;
-      positions[i] = normal[0] * newRadius;
-      positions[i + 1] = normal[1] * newRadius;
-      positions[i + 2] = normal[2] * newRadius;
-    }
-
     return {
       position: positions,
       texcoord: texcoords,
@@ -162,6 +147,27 @@ function main() {
           points.push([x, y]);
       }
       return points;
+  }
+
+  function applyNoiseToSphere(positions, passes = 1) {
+    for (let pass = 0; pass < passes; pass++) {  
+      for (let i = 0; i < positions.length; i = i + 3) {
+        const position = [positions[i], positions[i + 1], positions[i + 2]];
+        const normal = twgl.v3.normalize(position);
+        const calculatedNoise = noise.calcNoise(
+          planetSphereData.noiseType,
+          position[0],
+          position[1],
+          position[2],
+          planetSphereData.noiseScale * Math.pow(2, pass)
+        );
+        const newRadius = planetSphereData.radius + calculatedNoise * planetSphereData.noiseAmplitude / Math.pow(2, pass);
+        positions[i] = normal[0] * newRadius;
+        positions[i + 1] = normal[1] * newRadius;
+        positions[i + 2] = normal[2] * newRadius;
+      }
+    }
+    return positions;
   }
 
   const programInfo = twgl.createProgramInfo(gl, [vs, fs]);
@@ -186,6 +192,8 @@ function main() {
         true, 
         true
     );
+
+    arrays.position = applyNoiseToSphere(arrays.position, planetSphereData.numberOfNoisePasses);
     
     if (!bufferInfo) {
       bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
@@ -243,8 +251,9 @@ function main() {
     { type: "slider", key: "divisions", change: update, min: 3, max: 100, precision: 0, name: "Divisions" },
     { type: "slider", key: "radius", change: update, min: 0.5, max: 5.0, precision: 2, step: 0.1, name: "Radius" },
     { type: "slider", key: "rotatingSpeed", change: update, min: 1, max: 200, precision: 0, name: "Rotating Speed" },
-    { type: "slider", key: "noiseScale", change: update, min: 0.1, max: 10.0, precision: 2, step: 0.1, name: "Noise Scale" },
+    { type: "slider", key: "noiseScale", change: update, min: 0.1, max: 10.0, precision: 2, step: 0.05, name: "Noise Scale" },
     { type: "slider", key: "noiseAmplitude", change: update, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Noise Amplitude" },
+    { type: "slider", key: "numberOfNoisePasses", change: update, min: 1, max: 5, precision: 0, name: "Number of Noise Passes" },
     { type: "slider", key: "waterLevel", change: update, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Water Level" },
   ]);
 
