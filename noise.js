@@ -87,6 +87,19 @@ class PerlinAlgorithm {
 
         return this.lerp(y1, y2, w);
     }
+
+    octavePerlin(x, y, z, octaves, frequency = 1, persistence) {
+        let total = 0;
+        let amplitude = 1;
+        let maxValue = 0;
+        for (let i = 0; i < octaves; i++) {
+            total += this.perlin(x * frequency, y * frequency, z * frequency) * amplitude;
+            maxValue += amplitude;
+            amplitude *= persistence;
+            frequency *= 2;
+        }
+        return total / maxValue;
+    }
 }
 
 class RandomAlgorithm {
@@ -109,16 +122,16 @@ class Noise {
         this.randomAlgorithm = new RandomAlgorithm();
     }
 
-    calcNoise(type, x, y, z, scale = 1.0) {
-        const sx = x * scale;
-        const sy = y * scale;
-        const sz = z * scale;
+    calcNoise(type, x, y, z, frequency = 1.0, octaves = 1, persistence = 0.5) {
 
         if (type === "perlin") {
-            return this.perlinAlgorithm.perlin(sx, sy, sz);
+            return this.perlinAlgorithm.perlin(frequency * x, frequency * y, frequency * z);
         } 
         else if (type === "random") {
-            return this.randomAlgorithm.random(sx, sy, sz);
+            return this.randomAlgorithm.random(frequency * x, frequency * y, frequency * z);
+        }
+        else if (type === "octavePerlin") {
+            return this.perlinAlgorithm.octavePerlin(x, y, z, frequency, octaves, persistence);
         }
         
         return 0; 
