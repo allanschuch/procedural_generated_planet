@@ -10,11 +10,13 @@ uniform mat4 u_matrix;
 
 out vec2 v_texcoord;
 out vec3 v_normal;
+out float v_height;
 
 void main() {
   gl_Position = u_matrix * a_position;
   v_texcoord = a_texcoord;
   v_normal = a_normal;
+  v_height = length(a_position);
 }
 `;
 
@@ -23,15 +25,39 @@ precision highp float;
 
 in vec2 v_texcoord;
 in vec3 v_normal;
+in float v_height;
 
-out vec4 outColor;
+out vec4 out_color;
 
 uniform sampler2D u_texture;
 
+uniform float u_waterAltitude;
+uniform float u_grassAltitude;
+uniform float u_rockAltitude;
+
+uniform vec4 u_colorWater;
+uniform vec4 u_colorSand;
+uniform vec4 u_colorGrass;
+uniform vec4 u_colorRock;
+uniform vec4 u_colorSnow;
+
 void main() {
-   // Visualização simples por enquanto
-   outColor = texture(u_texture, v_texcoord);
-   // outColor = vec4(v_normal * 0.5 + 0.5, 1.0);
+  // out_color = texture(u_texture, v_texcoord);
+  if (v_height < u_waterAltitude) {
+       out_color = u_colorWater;
+   } 
+   else if (v_height < u_waterAltitude + 0.02) {
+       out_color = u_colorSand;
+   }
+   else if (v_height < u_grassAltitude) {
+       out_color = u_colorGrass;
+   }
+   else if (v_height < u_rockAltitude) {
+       out_color = u_colorRock;
+   }
+   else {
+       out_color = u_colorSnow;
+   }
 }
 `;
 
@@ -57,7 +83,9 @@ function main() {
     noiseAmplitude: 0.2,
     numberOfNoiseOctaves: 1,
     noisePersistence: 0.5,
-    waterLevel: 0.2,
+    waterAltitude: 0.2,
+    grassAltitude: 0.4,
+    rockAltitude: 0.7
   };
 
   const noiseTypeMap = [
@@ -73,6 +101,14 @@ function main() {
   };
 
   const noise = new Noise();
+
+  const programInfo = twgl.createProgramInfo(gl, [vs, fs]);
+
+  const texInfo = loadImageAndCreateTextureInfo("https://webgl2fundamentals.org/webgl/resources/uv-grid.png", render);
+
+  let projectionMatrix;
+  let bufferInfo;
+  let vao;
 
   // --- FUNÇÃO LATHE (Gira o perfil para criar 3D) ---
   function lathePoints(points,
@@ -178,15 +214,6 @@ function main() {
     return positions;
   }
 
-  const programInfo = twgl.createProgramInfo(gl, [vs, fs]);
-
-  const texInfo = loadImageAndCreateTextureInfo("https://webgl2fundamentals.org/webgl/resources/uv-grid.png", render);
-
-  let worldMatrix = m4.identity();
-  let projectionMatrix;
-  let bufferInfo;
-  let vao;
-
   // --- UPDATE: Usa planetSphereData ---
   function update() {
     // Acessando os parâmetros do nosso objeto organizado
@@ -217,6 +244,35 @@ function main() {
     render();
   }
 
+  function setCameraMatrix() {
+    const fov = cameraData.fov * Math.PI / 180;
+    const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+    projectionMatrix = m4.perspective(fov, aspect, 0.1, 100);
+
+    const cameraRadius = cameraData.radius;
+    const cameraPosition = [0, 0, cameraRadius];
+    const target = [0, 0, 0];
+    const up = [0, 1, 0];
+    return m4.lookAt(cameraPosition, target, up);
+  }
+
+  function lerpAltitude(a, b, t) {
+    return a + (b - a) * t;
+  }
+
+  function getTerrainColorAltitude() {
+    const maxAltitude = planetSphereData.radius + planetSphereData.noiseAmplitude;
+    const minAltitude = 1;
+    const waterAltitude = lerpAltitude(minAltitude, maxAltitude, planetSphereData.waterAltitude);
+    const grassAltitude = lerpAltitude(minAltitude, maxAltitude, planetSphereData.grassAltitude);
+    const rockAltitude = lerpAltitude(minAltitude, maxAltitude, planetSphereData.rockAltitude);
+    return {
+      water: waterAltitude,
+      grass: grassAltitude,
+      rock: rockAltitude
+    };
+  }
+
   function render(time) {
     if(time) time *= 0.001;
     
@@ -226,15 +282,7 @@ function main() {
     gl.enable(gl.DEPTH_TEST);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    const fov = cameraData.fov * Math.PI / 180;
-    const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-    projectionMatrix = m4.perspective(fov, aspect, 0.1, 100);
-
-    const radius = cameraData.radius;
-    const cameraPosition = [0, 0, radius];
-    const target = [0, 0, 0];
-    const up = [0, 1, 0];
-    const cameraMatrix = m4.lookAt(cameraPosition, target, up);
+    const cameraMatrix = setCameraMatrix();
     const viewMatrix = m4.inverse(cameraMatrix);
     const viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
 
@@ -243,9 +291,21 @@ function main() {
     gl.useProgram(programInfo.program);
     gl.bindVertexArray(vao);
 
+    const terrainColorAltitude = getTerrainColorAltitude();
+
     twgl.setUniforms(programInfo, {
       u_matrix: m4.multiply(viewProjectionMatrix, currentWorldMatrix),
       u_texture: texInfo.texture,
+
+      u_waterAltitude: terrainColorAltitude.water,
+      u_grassAltitude: terrainColorAltitude.grass,
+      u_rockAltitude: terrainColorAltitude.rock,
+
+      u_colorWater: [0.0, 0.0, 1.0, 1.0],
+      u_colorSand: [0.76, 0.7, 0.5, 1.0],
+      u_colorGrass: [0.0, 1.0, 0.0, 1.0],
+      u_colorRock: [0.5, 0.5, 0.5, 1.0],
+      u_colorSnow: [1.0, 1.0, 1.0, 1.0]
     });
 
     twgl.drawBufferInfo(gl, bufferInfo);
@@ -264,7 +324,9 @@ function main() {
     { type: "slider", key: "noiseAmplitude", change: update, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Noise Amplitude" },
     { type: "slider", key: "numberOfNoiseOctaves", change: update, min: 1, max: 5, precision: 0, name: "Number of Noise Octaves" },
     { type: "slider", key: "noisePersistence", change: update, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Noise Persistence" },
-    { type: "slider", key: "waterLevel", change: update, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Water Level" },
+    { type: "slider", key: "waterAltitude", change: update, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Water Altitude" },
+    { type: "slider", key: "grassAltitude", change: update, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Grass Altitude" },
+    { type: "slider", key: "rockAltitude", change: update, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Rock Altitude" },
   ]);
 
   webglLessonsUI.setupUI(document.querySelector("#ui-camera"), cameraData, [
