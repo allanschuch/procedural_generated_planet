@@ -114,6 +114,19 @@ class RandomAlgorithm {
         let index = Math.floor(Math.abs(x * 13 + y * 29 + z * 47)) % 256;
         return this.table[index];
     }
+
+    octaveRandom(x, y, z, octaves, frequency = 1, persistence) {
+        let total = 0;
+        let amplitude = 1;
+        let maxValue = 0;
+        for (let i = 0; i < octaves; i++) {
+            total += this.random(x * frequency, y * frequency, z * frequency) * amplitude;
+            maxValue += amplitude;
+            amplitude *= persistence;
+            frequency *= 2;
+        }
+        return total / maxValue;
+    }   
 }
 
 class Noise {
@@ -131,7 +144,7 @@ class Noise {
             return this.randomAlgorithm.random(frequency * x, frequency * y, frequency * z);
         }
         else if (type === "octavePerlin") {
-            return this.perlinAlgorithm.octavePerlin(x, y, z, frequency, octaves, persistence);
+            return this.perlinAlgorithm.octavePerlin(x, y, z, octaves, frequency, persistence);
         }
         
         return 0; 
