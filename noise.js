@@ -129,10 +129,94 @@ class RandomAlgorithm {
     }   
 }
 
+class VoronoiAlgorithm {
+    
+    // Função auxiliar para gerar um ponto pseudo-aleatório (offset) 
+    // dentro da célula baseada nas coordenadas inteiras da célula.
+    getFeaturePoint(xi, yi, zi) {
+        // "Hashing" simples determinístico (shader style) para substituir o Random.value do Unity
+        // Retorna um vetor 3D com valores entre 0.0 e 1.0
+        let dotX = xi * 12.9898 + yi * 78.233 + zi * 37.719;
+        let dotY = xi * 39.3467 + yi * 11.135 + zi * 83.155;
+        let dotZ = xi * 73.156 + yi * 52.235 + zi * 9.151;
+        
+        // Mantém determinístico usando sin
+        let rx = (Math.sin(dotX) * 43758.5453) % 1; 
+        let ry = (Math.sin(dotY) * 43758.5453) % 1;
+        let rz = (Math.sin(dotZ) * 43758.5453) % 1;
+        
+        // Garante positivo (0..1)
+        return { 
+            x: Math.abs(rx), 
+            y: Math.abs(ry), 
+            z: Math.abs(rz) 
+        };
+    }
+
+    voronoi(x, y, z) {
+        // Coordenadas da Célula Inteira (Lattice)
+        let xi = Math.floor(x);
+        let yi = Math.floor(y);
+        let zi = Math.floor(z);
+
+        // Coordenada fracionária (posição dentro da célula atual)
+        let xf = x - xi;
+        let yf = y - yi;
+        let zf = z - zi;
+
+        let minDist = 1.0; // F1: Distância mínima inicia no máximo possível (1.0)
+
+        // Loop pelos vizinhos (3x3x3 grid)
+        // Equivalente ao loop z, y, x offset do tutorial
+        for (let zOffset = -1; zOffset <= 1; zOffset++) {
+            for (let yOffset = -1; yOffset <= 1; yOffset++) {
+                for (let xOffset = -1; xOffset <= 1; xOffset++) {
+                    
+                    // 1. Onde está o ponto "seed" deste vizinho?
+                    let pointOffset = this.getFeaturePoint(xi + xOffset, yi + yOffset, zi + zOffset);
+                    
+                    // 2. Vetor do ponto atual (xf, yf, zf) até o ponto "seed" do vizinho
+                    // Vector = NeighborCell + PointOffset - CurrentPosition
+                    let vectorX = xOffset + pointOffset.x - xf;
+                    let vectorY = yOffset + pointOffset.y - yf;
+                    let vectorZ = zOffset + pointOffset.z - zf;
+
+                    // 3. Distância Euclidiana
+                    let dist = Math.sqrt(vectorX * vectorX + vectorY * vectorY + vectorZ * vectorZ);
+
+                    // 4. Manter o menor (F1)
+                    if (dist < minDist) {
+                        minDist = dist;
+                    }
+                }
+            }
+        }
+        
+        // Retorna a distância para a borda da célula (0.0 a 1.0 aprox)
+        // Inverter (1 - minDist) cria "crateras" ou "células", 
+        // mas o padrão é retornar a distância bruta.
+        return minDist;
+    }
+
+    octaveVoronoi(x, y, z, octaves, frequency = 1, persistence) {
+        let total = 0;
+        let amplitude = 1;
+        let maxValue = 0;
+        for (let i = 0; i < octaves; i++) {
+            total += this.voronoi(x * frequency, y * frequency, z * frequency) * amplitude;
+            maxValue += amplitude;
+            amplitude *= persistence;
+            frequency *= 2;
+        }
+        return total / maxValue;
+    }
+}
+
 class Noise {
     constructor() {
         this.perlinAlgorithm = new PerlinAlgorithm();
         this.randomAlgorithm = new RandomAlgorithm();
+        this.voronoiAlgorithm = new VoronoiAlgorithm();
     }
 
     calcNoise(type, x, y, z, frequency = 1.0, octaves = 1, persistence = 0.5) {
@@ -143,11 +227,23 @@ class Noise {
         else if (type === "random") {
             return this.randomAlgorithm.random(frequency * x, frequency * y, frequency * z);
         }
+        else if (type === "voronoiPeak") {
+            return 1 - this.voronoiAlgorithm.voronoi(frequency * x, frequency * y, frequency * z);
+        }
+        else if (type === "voronoiValley") {
+            return this.voronoiAlgorithm.voronoi(frequency * x, frequency * y, frequency * z);
+        }
         else if (type === "octavePerlin") {
             return this.perlinAlgorithm.octavePerlin(x, y, z, octaves, frequency, persistence);
         }
         else if (type === "octaveRandom") {
             return this.randomAlgorithm.octaveRandom(x, y, z, octaves, frequency, persistence);
+        }
+        else if (type === "octaveVoronoiPeak") {
+            return 1 - this.voronoiAlgorithm.octaveVoronoi(x, y, z, octaves, frequency, persistence);
+        }
+        else if (type === "octaveVoronoiValley") {
+            return this.voronoiAlgorithm.octaveVoronoi(x, y, z, octaves, frequency, persistence);
         }
         return 0; 
     }

@@ -46,8 +46,8 @@ function main() {
   // Aqui ficarão todos os controles da nossa geração procedural
   const planetSphereData = {
     // Parâmetros da Malha (Sessão 1)
-    resolution: 20,    // Pontos verticais (perfil)
-    divisions: 30,     // Pontos horizontais (fatias)
+    resolution: 100,    // Pontos verticais (perfil)
+    divisions: 100,     // Pontos horizontais (fatias)
     radius: 1.0,        // Raio da esfera
     // Parâmetros de Animação
     rotatingSpeed: 50, // Velocidade de rotação
@@ -63,10 +63,12 @@ function main() {
   const noiseTypeMap = [
   "octavePerlin", 
   "octaveRandom",
+  "octaveVoronoiPeak",
+  "octaveVoronoiValley"
 ];
 
   const cameraData = {
-    radius: 5,
+    radius: 7.5,
     fov: 45,
   };
 
@@ -257,7 +259,7 @@ function main() {
     { type: "slider", key: "divisions", change: update, min: 3, max: 100, precision: 0, name: "Divisions" },
     { type: "slider", key: "radius", change: update, min: 0.5, max: 5.0, precision: 2, step: 0.1, name: "Radius" },
     { type: "slider", key: "rotatingSpeed", change: update, min: 1, max: 200, precision: 0, name: "Rotating Speed" },
-    { type: "slider", key: "noiseType", change: update, min: 0, max: 1, precision: 0, step: 1, name: "Noise Type" },
+    { type: "slider", key: "noiseType", change: update, min: 0, max: 3, precision: 0, step: 1, name: "Noise Type" },
     { type: "slider", key: "noiseFrequency", change: update, min: 0.1, max: 10.0, precision: 2, step: 0.05, name: "Noise Frequency" },
     { type: "slider", key: "noiseAmplitude", change: update, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Noise Amplitude" },
     { type: "slider", key: "numberOfNoiseOctaves", change: update, min: 1, max: 5, precision: 0, name: "Number of Noise Octaves" },
