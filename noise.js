@@ -146,7 +146,9 @@ class Noise {
         else if (type === "octavePerlin") {
             return this.perlinAlgorithm.octavePerlin(x, y, z, octaves, frequency, persistence);
         }
-        
+        else if (type === "octaveRandom") {
+            return this.randomAlgorithm.octaveRandom(x, y, z, octaves, frequency, persistence);
+        }
         return 0; 
     }
 }
