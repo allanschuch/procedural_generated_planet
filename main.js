@@ -3,18 +3,15 @@
 // --- SHADERS ---
 const vs = `#version 300 es
 in vec4 a_position;
-in vec2 a_texcoord;
 in vec3 a_normal;
 
 uniform mat4 u_matrix;
 
-out vec2 v_texcoord;
 out vec3 v_normal;
 out float v_height;
 
 void main() {
   gl_Position = u_matrix * a_position;
-  v_texcoord = a_texcoord;
   v_normal = a_normal;
   v_height = length(a_position.xyz);
 }
@@ -23,7 +20,6 @@ void main() {
 const fs = `#version 300 es
 precision highp float;
 
-in vec2 v_texcoord;
 in vec3 v_normal;
 in float v_height;
 
@@ -42,7 +38,6 @@ uniform vec4 u_colorRock;
 uniform vec4 u_colorSnow;
 
 void main() {
-  // out_color = texture(u_texture, v_texcoord);
   if (v_height < u_waterAltitude) {
        out_color = u_colorWater;
    } 
@@ -104,7 +99,7 @@ function main() {
 
   const programInfo = twgl.createProgramInfo(gl, [vs, fs]);
 
-  const texInfo = loadImageAndCreateTextureInfo("https://webgl2fundamentals.org/webgl/resources/uv-grid.png", render);
+  // const texInfo = loadImageAndCreateTextureInfo("https://webgl2fundamentals.org/webgl/resources/uv-grid.png", render);
 
   let projectionMatrix;
   let bufferInfo;
@@ -118,7 +113,7 @@ function main() {
                        capStart,     
                        capEnd) {     
     const positions = [];
-    const texcoords = [];
+    // const texcoords = [];
     const normals = [];
     const indices = [];
 
@@ -135,7 +130,7 @@ function main() {
         const p = [0, points[0][1], 0];
         const tp = m4.transformPoint(mat, p); 
         positions.push(tp[0], tp[1], tp[2]);
-        texcoords.push(u, 0);
+        // texcoords.push(u, 0);
 
         const normal = twgl.v3.normalize(tp);
         normals.push(normal[0], normal[1], normal[2]);
@@ -145,8 +140,8 @@ function main() {
         const tp = m4.transformPoint(mat, [...p, 0]);
         positions.push(tp[0], tp[1], tp[2]);
         
-        const v = (ndx + vOffset) / quadsDown;
-        texcoords.push(u, v);
+        // const v = (ndx + vOffset) / quadsDown;
+        // texcoords.push(u, v);
 
         const normal = twgl.v3.normalize(tp);
         normals.push(normal[0], normal[1], normal[2]);
@@ -156,7 +151,7 @@ function main() {
         const p = [0, points[points.length - 1][1], 0];
         const tp = m4.transformPoint(mat, p);
         positions.push(tp[0], tp[1], tp[2]);
-        texcoords.push(u, 1);
+        // texcoords.push(u, 1);
 
         const normal = twgl.v3.normalize(tp);
         normals.push(normal[0], normal[1], normal[2]);
@@ -174,7 +169,7 @@ function main() {
 
     return {
       position: positions,
-      texcoord: texcoords,
+      // texcoord: texcoords,
       normal: normals,
       indices: indices,
     };
@@ -295,7 +290,7 @@ function main() {
 
     twgl.setUniforms(programInfo, {
       u_matrix: m4.multiply(viewProjectionMatrix, currentWorldMatrix),
-      u_texture: texInfo.texture,
+      // u_texture: texInfo.texture,
 
       u_waterAltitude: terrainColorAltitude.water,
       u_grassAltitude: terrainColorAltitude.grass,
@@ -333,25 +328,6 @@ function main() {
     { type: "slider", key: "radius", change: update, min: 2, max: 20, precision: 1, step: 0.1, name: "Camera Radius" },
     { type: "slider", key: "fov", change: update, min: 10, max: 120, precision: 0, name: "Field of View" },
   ]);
-
-  function loadImageAndCreateTextureInfo(url, callback) {
-    var tex = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
-    var textureInfo = { width: 1, height: 1, texture: tex };
-    var img = new Image();
-    img.crossOrigin = "anonymous";
-    img.addEventListener('load', function() {
-      textureInfo.width = img.width;
-      textureInfo.height = img.height;
-      gl.bindTexture(gl.TEXTURE_2D, textureInfo.texture);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-      gl.generateMipmap(gl.TEXTURE_2D);
-      if (callback) callback();
-    });
-    img.src = url;
-    return textureInfo;
-  }
   
   function lerp(a, b, t) {
     return a + (b - a) * t;
