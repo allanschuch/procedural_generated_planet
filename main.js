@@ -16,7 +16,7 @@ void main() {
   gl_Position = u_matrix * a_position;
   v_texcoord = a_texcoord;
   v_normal = a_normal;
-  v_height = length(a_position);
+  v_height = length(a_position.xyz);
 }
 `;
 
@@ -83,9 +83,9 @@ function main() {
     noiseAmplitude: 0.2,
     numberOfNoiseOctaves: 1,
     noisePersistence: 0.5,
-    waterAltitude: 0.2,
-    grassAltitude: 0.4,
-    rockAltitude: 0.7
+    waterAltitude: 0.35,
+    grassAltitude: 0.6,
+    rockAltitude: 0.75
   };
 
   const noiseTypeMap = [
@@ -262,7 +262,7 @@ function main() {
 
   function getTerrainColorAltitude() {
     const maxAltitude = planetSphereData.radius + planetSphereData.noiseAmplitude;
-    const minAltitude = 1;
+    const minAltitude = planetSphereData.radius - planetSphereData.noiseAmplitude;
     const waterAltitude = lerpAltitude(minAltitude, maxAltitude, planetSphereData.waterAltitude);
     const grassAltitude = lerpAltitude(minAltitude, maxAltitude, planetSphereData.grassAltitude);
     const rockAltitude = lerpAltitude(minAltitude, maxAltitude, planetSphereData.rockAltitude);
@@ -315,13 +315,13 @@ function main() {
 
   // --- UI: Conectada ao planetSphereData ---
   webglLessonsUI.setupUI(document.querySelector("#ui-planet"), planetSphereData, [
-    { type: "slider", key: "resolution", change: update, min: 5, max: 100, precision: 0, name: "Resolution" },
-    { type: "slider", key: "divisions", change: update, min: 3, max: 100, precision: 0, name: "Divisions" },
+    { type: "slider", key: "resolution", change: update, min: 5, max: 300, precision: 0, name: "Resolution" },
+    { type: "slider", key: "divisions", change: update, min: 3, max: 300, precision: 0, name: "Divisions" },
     { type: "slider", key: "radius", change: update, min: 0.5, max: 5.0, precision: 2, step: 0.1, name: "Radius" },
     { type: "slider", key: "rotatingSpeed", change: update, min: 1, max: 200, precision: 0, name: "Rotating Speed" },
     { type: "slider", key: "noiseType", change: update, min: 0, max: 3, precision: 0, step: 1, name: "Noise Type" },
     { type: "slider", key: "noiseFrequency", change: update, min: 0.1, max: 10.0, precision: 2, step: 0.05, name: "Noise Frequency" },
-    { type: "slider", key: "noiseAmplitude", change: update, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Noise Amplitude" },
+    { type: "slider", key: "noiseAmplitude", change: update, min: 0.01, max: 3.0, precision: 2, step: 0.01, name: "Noise Amplitude" },
     { type: "slider", key: "numberOfNoiseOctaves", change: update, min: 1, max: 5, precision: 0, name: "Number of Noise Octaves" },
     { type: "slider", key: "noisePersistence", change: update, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Noise Persistence" },
     { type: "slider", key: "waterAltitude", change: update, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Water Altitude" },
