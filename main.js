@@ -29,21 +29,17 @@ function main() {
             planetNode.drawInfo.uniforms = planet.uniforms;
             planetNode.drawInfo.bufferInfo = planetBufferInfo;
         } else {
-            planetBufferInfo = twgl.createBufferInfoFromArrays(gl, planet.arrays);
+            twgl.setAttribInfoBufferFromArray(gl, planetBufferInfo.attribs.a_position, planet.arrays.position);
+            twgl.setAttribInfoBufferFromArray(gl, planetBufferInfo.attribs.a_normal, planet.arrays.normal);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, planetBufferInfo.indices);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(planet.arrays.indices), gl.STATIC_DRAW);
+            planetBufferInfo.numElements = planet.arrays.indices.length;
+
             planetNode.drawInfo.uniforms = planet.uniforms;
-            planetNode.drawInfo.bufferInfo = planetBufferInfo;
         }
     }
     
     updatePlanet();
-
-    // webglLessonsUI.setupUI(document.querySelector("#ui-planet"), myPlanet.data, [
-    //     { type: "slider", key: "resolution", change: updatePlanet, min: 10, max: 200, precision: 0 },
-    //     { type: "slider", key: "divisions", change: updatePlanet, min: 10, max: 200, precision: 0 },
-    //     { type: "slider", key: "radius", change: updatePlanet, min: 0.5, max: 5.0, precision: 2, step: 0.1 },
-    //     { type: "slider", key: "noiseAmplitude", change: updatePlanet, min: 0.01, max: 3.0, precision: 2, step: 0.01 },
-    //     // ... adicione os outros ...
-    // ]);
 
     const cameraData = { radius: 7.5, fov: 45 };
 
@@ -61,6 +57,26 @@ function main() {
         return m4.perspective(fov, aspect, 0.1, 100);
     }
 
+    webglLessonsUI.setupUI(document.querySelector("#ui-planet"), planet.data, [
+        { type: "slider", key: "resolution", change: updatePlanet, min: 3, max: 300, precision: 0, name: "Resolution" },
+        { type: "slider", key: "divisions", change: updatePlanet, min: 3, max: 300, precision: 0, name: "Divisions" },
+        { type: "slider", key: "radius", change: updatePlanet, min: 0.5, max: 5.0, precision: 2, step: 0.1, name: "Radius" },
+        { type: "slider", key: "rotatingSpeed", change: updatePlanet, min: 1, max: 200, precision: 0, name: "Rotating Speed" },
+        { type: "slider", key: "noiseType", change: updatePlanet, min: 0, max: 3, precision: 0, step: 1, name: "Noise Type" },
+        { type: "slider", key: "noiseFrequency", change: updatePlanet, min: 0.1, max: 10.0, precision: 2, step: 0.05, name: "Noise Frequency" },
+        { type: "slider", key: "noiseAmplitude", change: updatePlanet, min: 0.01, max: 3.0, precision: 2, step: 0.01, name: "Noise Amplitude" },
+        { type: "slider", key: "numberOfNoiseOctaves", change: updatePlanet, min: 1, max: 5, precision: 0, name: "Number of Noise Octaves" },
+        { type: "slider", key: "noisePersistence", change: updatePlanet, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Noise Persistence" },
+        { type: "slider", key: "waterAltitude", change: updatePlanet, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Water Altitude" },
+        { type: "slider", key: "grassAltitude", change: updatePlanet, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Grass Altitude" },
+        { type: "slider", key: "rockAltitude", change: updatePlanet, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Rock Altitude" },
+    ]);
+
+    webglLessonsUI.setupUI(document.querySelector("#ui-camera"), cameraData, [
+        { type: "slider", key: "radius", change: drawScene, min: 2, max: 20, precision: 1, step: 0.1, name: "Camera Radius" },
+        { type: "slider", key: "fov", change: drawScene, min: 10, max: 120, precision: 0, name: "Field of View" },
+    ]);
+
     function drawScene(time) {
         time *= 0.001;
         twgl.resizeCanvasToDisplaySize(gl.canvas);
@@ -73,8 +89,8 @@ function main() {
         const viewMatrix = m4.inverse(cameraMatrix);
         const viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
 
-        const rotationSpeed = 0.5;
-        m4.yRotation(time * rotationSpeed, planetNode.localMatrix);
+        m4.yRotation(time * planet.data.rotatingSpeed * 0.02 || 0, planetNode.localMatrix);
+
 
         planetNode.updateWorldMatrix();
         
@@ -98,7 +114,7 @@ function main() {
 
         requestAnimationFrame(drawScene);
     }
-    requestAnimationFrame(drawScene); 
+    requestAnimationFrame(drawScene);
 }
 
 main();

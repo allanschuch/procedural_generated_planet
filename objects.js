@@ -9,13 +9,14 @@ class Planet {
             resolution: 100,
             divisions: 100,
             radius: 1.0,
+            rotatingSpeed: 50,
             noiseType: 0,
             noiseFrequency: 1.0,
             noiseAmplitude: 0.2,
-            octaves: 1,
-            persistence: 0.5,
-            waterAltitude: 0.2,
-            grassAltitude: 0.4,
+            numberOfNoiseOctaves: 1,
+            noisePersistence: 0.5,
+            waterAltitude: 0.35,
+            grassAltitude: 0.55,
             rockAltitude: 0.7,
             waterColor: [0.0, 0.0, 1.0, 1.0],
             sandColor: [0.76, 0.7, 0.5, 1.0],
@@ -107,7 +108,7 @@ class Planet {
         
         this.arrays = this.lathePoints(curvePoints, 0, Math.PI * 2, this.data.divisions);
         
-        this.arrays.position = this.applyNoiseToSphere(this.arrays.position, this.data.octaves, this.data.noiseFrequency, this.data.persistence);
+        this.arrays.position = this.applyNoiseToSphere(this.arrays.position, this.data.numberOfNoiseOctaves, this.data.noiseFrequency, this.data.noisePersistence);
 
         this.updateUniforms();
     }
