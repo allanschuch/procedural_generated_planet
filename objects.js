@@ -228,10 +228,13 @@ class Planet {
 class Stone {
     constructor() {        
         this.data = {
-            numberOfStones: 15,
+            numberOfStones: 175,
             stoneCubeSize: 0,
-            stoneScale: 0.1,
-            minDistanceBetweenStones: 0.01,
+            tempStoneScale: 1.0,
+            stoneScale: 1.0,
+            minScaleFactor: 0.5,
+            maxScaleFactor: 2.0,
+            minDistanceBetweenStones: 0.2,
             color: [0.7, 0.7, 0.8, 1.0]
         };
     }
@@ -267,9 +270,16 @@ class Stone {
         }
         `;
     }
+    
+    getRandomScaleFactor() {
+        return Math.random() * (this.data.maxScaleFactor - this.data.minScaleFactor) + this.data.minScaleFactor;
+    }
+
+    getStoneCubeSize(planetRadius) {
+        return  planetRadius * 0.025;
+    }
 
     getStoneArrays(planetRadius) {
-        this.stoneCubeSize = planetRadius * this.data.stoneScale;
-        return twgl.primitives.createCubeVertices(this.stoneCubeSize);
+        return twgl.primitives.createCubeVertices(this.getStoneCubeSize(planetRadius));
     }
 }

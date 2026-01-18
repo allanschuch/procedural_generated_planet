@@ -30,7 +30,15 @@ function main() {
         stones: [],
     }
 
-    // function updateStoneScale()
+    function updateStoneScale(){
+        const newScaleFactor = stone.data.tempStoneScale;
+        const previousScaleFactor = stone.data.stoneScale;
+        stone.data.stoneScale = newScaleFactor;     
+        const scaleRatio = newScaleFactor / previousScaleFactor;
+        objects.stones.forEach(stoneNode => {
+            stoneNode.localMatrix = m4.scale(stoneNode.localMatrix, scaleRatio, scaleRatio, scaleRatio);
+        });
+    }
 
     function getRandomPositionOnPlanetSurface() {
         const randomIndex = Math.floor(Math.random() * (planet.arrays.position.length / 3));
@@ -59,10 +67,10 @@ function main() {
             if (tries > maxTries) break;
             const position = getRandomPositionOnPlanetSurface();
             const positionAltitude = twgl.v3.length(position);
-            if (positionAltitude >= minAltitude && positionAltitude <= maxAltitude) {
+            if (positionAltitude > minAltitude && positionAltitude < maxAltitude) {
                 if (positions.every(existingPosition => {
                     const distance = twgl.v3.distance(existingPosition, position);
-                    return distance >= minDistanceBetweenStones;
+                    return distance >= minDistanceBetweenStones * planet.data.radius * 0.25;
                 })) {
                     positions.push(position);
                     i++;
@@ -91,12 +99,18 @@ function main() {
                     u_colorStone: stone.data.color
                 },
             };
-            
-            const target = [0, 0, 0];
-            const up = [0, 1, 0];        
-            stoneNode.localMatrix = m4.lookAt(position, target, up);
 
-            return stoneNode;
+            const normal = twgl.v3.normalize(position);
+            const look = m4.lookAt([0,0,0], normal, [0,1,0]);
+            const rotationMatrix = m4.inverse(look);
+            const translationMatrix = m4.translation(position[0], position[1] + stone.getStoneCubeSize(planet.data.radius)/5, position[2]);
+            let localMatrix = m4.multiply(translationMatrix, rotationMatrix);
+            const scaleFactor = stone.getRandomScaleFactor() * stone.data.stoneScale;
+            localMatrix = m4.scale(localMatrix, scaleFactor, scaleFactor, scaleFactor);
+
+            stoneNode.localMatrix = localMatrix;
+
+        return stoneNode;
         });
     }
             
@@ -119,6 +133,7 @@ function main() {
 
             planetNode.drawInfo.uniforms = planet.uniforms;
         }
+        updateObjectsPlacement();
     }
     
     updatePlanet();
@@ -158,6 +173,12 @@ function main() {
     webglLessonsUI.setupUI(document.querySelector("#ui-camera"), cameraData, [
         { type: "slider", key: "radius", change: drawScene, min: 2, max: 20, precision: 1, step: 0.1, name: "Camera Radius" },
         { type: "slider", key: "fov", change: drawScene, min: 10, max: 120, precision: 0, name: "Field of View" },
+    ]);
+
+    webglLessonsUI.setupUI(document.querySelector("#ui-stones"), stone.data, [
+        { type: "slider", key: "tempStoneScale", change: updateStoneScale, min: 0.1, max: 3.0, precision: 2, step: 0.01, name: "Stone Scale" },
+        { type: "slider", key: "numberOfStones", change: updateObjectsPlacement, min: 1, max: 500, precision: 0, name: "Number of Stones" },
+        { type: "slider", key: "minDistanceBetweenStones", change: updateObjectsPlacement, min: 0.01, max: 1.0, precision: 2, step: 0.01, name: "Min Distance Between Stones" },
     ]);
 
     function updateObjects_u_matrixAndGetObjectsToDraw(viewProjectionMatrix) {
