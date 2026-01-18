@@ -6,9 +6,9 @@ function main() {
     if (!gl) return;
     twgl.setDefaults({attribPrefix: "a_"});
 
-    const noiseGen = new Noise();
+    // PLANET CONFIG
 
-    const planet = new Planet(noiseGen);
+    const planet = new Planet();
 
     const planetProgramInfo = twgl.createProgramInfo(gl, [Planet.vs, Planet.fs]);
     let planetBufferInfo = null;
@@ -16,8 +16,90 @@ function main() {
     const planetNode = new Node();
     planetNode.localMatrix = m4.identity();
 
-    const objects = [planetNode];
-    const objectsToDraw = [planetNode.drawInfo];
+    // STONES CONFIG
+
+    const stone = new Stone();
+
+    const StoneProgramInfo = twgl.createProgramInfo(gl, [Stone.vs, Stone.fs]);
+    const stoneArrays = stone.getStoneArrays(planet.data.radius);
+    let stoneBufferInfo = twgl.createBufferInfoFromArrays(gl, stoneArrays);
+    let stoneVAO = twgl.createVAOFromBufferInfo(gl, StoneProgramInfo, stoneBufferInfo);
+
+    let objects = {
+        planets: [planetNode],
+        stones: [],
+    }
+
+    // function updateStoneScale()
+
+    function getRandomPositionOnPlanetSurface() {
+        const randomIndex = Math.floor(Math.random() * (planet.arrays.position.length / 3));
+        const position = [
+            planet.arrays.position[randomIndex * 3],
+            planet.arrays.position[randomIndex * 3 + 1],
+            planet.arrays.position[randomIndex * 3 + 2],
+        ];
+
+        return position;
+    }
+
+    function lerp(a, b, t) {
+        return a + (b - a) * t;
+    }
+
+    function generateRandomPositions(maxTries, minDistanceBetweenStones, minAltitudeFactor = 0.01, maxAltitudeFactor = 1.0) {
+        const positions = [];
+        const planetMinRadius = planet.data.radius - planet.data.noiseAmplitude;
+        const planetMaxRadius = planet.data.radius + planet.data.noiseAmplitude;
+        const minAltitude = lerp(planetMinRadius, planetMaxRadius, minAltitudeFactor);
+        const maxAltitude = lerp(planetMinRadius, planetMaxRadius, maxAltitudeFactor);
+        let tries = 0;
+        for (let i = 0; i < stone.data.numberOfStones; ) {
+            tries++;
+            if (tries > maxTries) break;
+            const position = getRandomPositionOnPlanetSurface();
+            const positionAltitude = twgl.v3.length(position);
+            if (positionAltitude >= minAltitude && positionAltitude <= maxAltitude) {
+                if (positions.every(existingPosition => {
+                    const distance = twgl.v3.distance(existingPosition, position);
+                    return distance >= minDistanceBetweenStones;
+                })) {
+                    positions.push(position);
+                    i++;
+                }
+            }
+        }
+        return positions;
+    }
+
+    function updateObjectsPlacement() {
+        objects.stones.forEach(stone => stone.setParent(null));
+        objects.stones = [];
+        const planetNode = objects.planets[0];
+        
+        const stonePositions = generateRandomPositions(1000, stone.data.minDistanceBetweenStones, planet.data.waterAltitude, 1.0);
+        console.log(`Generated ${stonePositions.length} stones.`);
+        
+        objects.stones = stonePositions.map(position => {
+            const stoneNode = new Node();
+            stoneNode.setParent(planetNode);
+            stoneNode.drawInfo = {
+                vertexArray: stoneVAO,       
+                programInfo: StoneProgramInfo, 
+                bufferInfo: stoneBufferInfo,
+                uniforms: {
+                    u_colorStone: stone.data.color
+                },
+            };
+            
+            const target = [0, 0, 0];
+            const up = [0, 1, 0];        
+            stoneNode.localMatrix = m4.lookAt(position, target, up);
+
+            return stoneNode;
+        });
+    }
+            
 
     function updatePlanet() {
         planet.update();
@@ -40,6 +122,7 @@ function main() {
     }
     
     updatePlanet();
+    updateObjectsPlacement();
 
     const cameraData = { radius: 7.5, fov: 45 };
 
@@ -77,6 +160,23 @@ function main() {
         { type: "slider", key: "fov", change: drawScene, min: 10, max: 120, precision: 0, name: "Field of View" },
     ]);
 
+    function updateObjects_u_matrixAndGetObjectsToDraw(viewProjectionMatrix) {
+        const drawables = [];
+        objects.planets.forEach(planet => {
+            if (planet.drawInfo) {
+                planet.drawInfo.uniforms.u_matrix = m4.multiply(viewProjectionMatrix, planet.worldMatrix);
+                drawables.push(planet.drawInfo);
+            }
+        });
+        objects.stones.forEach(stone => {
+            if (stone.drawInfo) {
+                stone.drawInfo.uniforms.u_matrix = m4.multiply(viewProjectionMatrix, stone.worldMatrix);
+                drawables.push(stone.drawInfo);
+            }
+        });
+        return drawables;
+    }
+
     function drawScene(time) {
         time *= 0.001;
         twgl.resizeCanvasToDisplaySize(gl.canvas);
@@ -90,26 +190,11 @@ function main() {
         const viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
 
         m4.yRotation(time * planet.data.rotatingSpeed * 0.02 || 0, planetNode.localMatrix);
-
-
+        
         planetNode.updateWorldMatrix();
         
-        objects.forEach(object => {
-            if (object.drawInfo) {
-                object.drawInfo.uniforms.u_matrix = m4.multiply(viewProjectionMatrix, object.worldMatrix);
-            }
-        });
-        
-        // Função recursiva simples para coletar desenháveis
-        // function collectDrawables(node) {
-        //     if (node.drawInfo) {
-        //         // Injeta a matriz final no uniforme
-        //         node.drawInfo.uniforms.u_matrix = m4.multiply(viewProjectionMatrix, node.worldMatrix);
-        //         objectsToDraw.push(node.drawInfo);
-        //     }
-        //     node.children.forEach(collectDrawables);
-        // }
-
+        const objectsToDraw = updateObjects_u_matrixAndGetObjectsToDraw(viewProjectionMatrix);
+    
         twgl.drawObjectList(gl, objectsToDraw);
 
         requestAnimationFrame(drawScene);

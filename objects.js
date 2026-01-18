@@ -1,8 +1,8 @@
 "use strict";
 
 class Planet {
-    constructor(noiseGen) {
-        this.noise = noiseGen;
+    constructor() {
+        this.noise = new Noise();
         this.noiseTypeMap = ["octavePerlin", "octaveRandom", "octaveVoronoiPeak", "octaveVoronoiValley"];
         
         this.data = {
@@ -222,5 +222,54 @@ class Planet {
         positions[i + 2] = normal[2] * newRadius;
         }
         return positions;
+    }
+}
+
+class Stone {
+    constructor() {        
+        this.data = {
+            numberOfStones: 15,
+            stoneCubeSize: 0,
+            stoneScale: 0.1,
+            minDistanceBetweenStones: 0.01,
+            color: [0.7, 0.7, 0.8, 1.0]
+        };
+    }
+
+    static get vs() {
+        return `#version 300 es
+        in vec4 a_position;
+        in vec3 a_normal;
+
+        uniform mat4 u_matrix;
+
+        out vec3 v_normal;
+
+        void main() {
+            gl_Position = u_matrix * a_position;
+            v_normal = a_normal;
+        }
+        `;
+    }
+
+    static get fs() {
+        return `#version 300 es
+        precision highp float;
+
+        in vec3 v_normal;
+
+        out vec4 out_color;
+
+        uniform vec4 u_colorStone;
+
+        void main() {
+            out_color = u_colorStone;
+        }
+        `;
+    }
+
+    getStoneArrays(planetRadius) {
+        this.stoneCubeSize = planetRadius * this.data.stoneScale;
+        return twgl.primitives.createCubeVertices(this.stoneCubeSize);
     }
 }
