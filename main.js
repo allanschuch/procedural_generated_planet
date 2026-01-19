@@ -25,9 +25,21 @@ function main() {
     let stoneBufferInfo = twgl.createBufferInfoFromArrays(gl, stoneArrays);
     let stoneVAO = twgl.createVAOFromBufferInfo(gl, StoneProgramInfo, stoneBufferInfo);
 
+    // TREES CONFIG
+
+    const tree = new Tree();
+    const treeProgramInfo = twgl.createProgramInfo(gl, [Tree.vs, Tree.fs]);
+    const trunkArrays = tree.getTrunkArrays(planet.data.radius);
+    const foliageArrays = tree.getFoliageArrays(planet.data.radius);
+    let trunkBufferInfo = twgl.createBufferInfoFromArrays(gl, trunkArrays);
+    let foliageBufferInfo = twgl.createBufferInfoFromArrays(gl, foliageArrays);
+    let trunkVAO = twgl.createVAOFromBufferInfo(gl, treeProgramInfo, trunkBufferInfo);
+    let foliageVAO = twgl.createVAOFromBufferInfo(gl, treeProgramInfo, foliageBufferInfo);
+
     let objects = {
         planets: [planetNode],
         stones: [],
+        trees: []
     }
 
     function updateStoneScale(){
@@ -40,12 +52,22 @@ function main() {
         });
     }
 
+    function updateTreeScale(){
+        const newScaleFactor = tree.data.tempTreeScale;
+        const previousScaleFactor = tree.data.treeScale;
+        tree.data.treeScale = newScaleFactor;     
+        const scaleRatio = newScaleFactor / previousScaleFactor;
+        objects.trees.forEach(treeNode => {
+            treeNode.localMatrix = m4.scale(treeNode.localMatrix, scaleRatio, scaleRatio, scaleRatio);
+        });
+    }
+
     function getRandomPositionOnPlanetSurface() {
-        const randomIndex = Math.floor(Math.random() * (planet.arrays.position.length / 3));
+        const randomIndex = Math.floor(Math.random() * (planet.planetArrays.position.length / 3));
         const position = [
-            planet.arrays.position[randomIndex * 3],
-            planet.arrays.position[randomIndex * 3 + 1],
-            planet.arrays.position[randomIndex * 3 + 2],
+            planet.planetArrays.position[randomIndex * 3],
+            planet.planetArrays.position[randomIndex * 3 + 1],
+            planet.planetArrays.position[randomIndex * 3 + 2],
         ];
 
         return position;
@@ -103,7 +125,7 @@ function main() {
             const normal = twgl.v3.normalize(position);
             const look = m4.lookAt([0,0,0], normal, [0,1,0]);
             const rotationMatrix = m4.inverse(look);
-            const translationMatrix = m4.translation(position[0], position[1] + stone.getStoneCubeSize(planet.data.radius)/5, position[2]);
+            const translationMatrix = m4.translation(position[0], position[1], position[2]);
             let localMatrix = m4.multiply(translationMatrix, rotationMatrix);
             const scaleFactor = stone.getRandomScaleFactor() * stone.data.stoneScale;
             localMatrix = m4.scale(localMatrix, scaleFactor, scaleFactor, scaleFactor);
@@ -118,18 +140,18 @@ function main() {
     function updatePlanet() {
         planet.update();
         if (!planetBufferInfo) {
-            planetBufferInfo = twgl.createBufferInfoFromArrays(gl, planet.arrays);
+            planetBufferInfo = twgl.createBufferInfoFromArrays(gl, planet.planetArrays);
             planetVAO = twgl.createVAOFromBufferInfo(gl, planetProgramInfo, planetBufferInfo);
             planetNode.drawInfo.vertexArray = planetVAO;
             planetNode.drawInfo.programInfo = planetProgramInfo;
             planetNode.drawInfo.uniforms = planet.uniforms;
             planetNode.drawInfo.bufferInfo = planetBufferInfo;
         } else {
-            twgl.setAttribInfoBufferFromArray(gl, planetBufferInfo.attribs.a_position, planet.arrays.position);
-            twgl.setAttribInfoBufferFromArray(gl, planetBufferInfo.attribs.a_normal, planet.arrays.normal);
+            twgl.setAttribInfoBufferFromArray(gl, planetBufferInfo.attribs.a_position, planet.planetArrays.position);
+            twgl.setAttribInfoBufferFromArray(gl, planetBufferInfo.attribs.a_normal, planet.planetArrays.normal);
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, planetBufferInfo.indices);
-            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(planet.arrays.indices), gl.STATIC_DRAW);
-            planetBufferInfo.numElements = planet.arrays.indices.length;
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(planet.planetArrays.indices), gl.STATIC_DRAW);
+            planetBufferInfo.numElements = planet.planetArrays.indices.length;
 
             planetNode.drawInfo.uniforms = planet.uniforms;
         }

@@ -26,7 +26,7 @@ class Planet {
         };
 
         this.uniforms = {};
-        this.arrays = null;
+        this.planetArrays = null;
     }
 
     static get vs() {
@@ -104,11 +104,11 @@ class Planet {
     }
 
     update() {
-        const curvePoints = this.getSpherePoints(this.data.resolution);
+        // const curvePoints = this.getSpherePoints(this.data.resolution);
         
-        this.arrays = this.lathePoints(curvePoints, 0, Math.PI * 2, this.data.divisions);
+        this.planetArrays = twgl.primitives.createSphereVertices(this.data.radius, this.data.divisions, this.data.resolution);
         
-        this.arrays.position = this.applyNoiseToSphere(this.arrays.position, this.data.numberOfNoiseOctaves, this.data.noiseFrequency, this.data.noisePersistence);
+        this.planetArrays.position = this.applyNoiseToSphere(this.planetArrays.position, this.data.numberOfNoiseOctaves, this.data.noiseFrequency, this.data.noisePersistence);
 
         this.updateUniforms();
     }
@@ -127,81 +127,81 @@ class Planet {
         };
     }
 
-    getSpherePoints(numPoints) {
-        const points = [];
-        for (let i = 0; i < numPoints; i++) {
-            const t = i / (numPoints - 1);
-            const angle = (Math.PI / 2) - (t * Math.PI); 
-            const x = Math.cos(angle) * this.data.radius;
-            const y = Math.sin(angle) * this.data.radius;
-            points.push([x, y]);
-        }
-        return points;
-    }
+    // getSpherePoints(numPoints) {
+    //     const points = [];
+    //     for (let i = 0; i < numPoints; i++) {
+    //         const t = i / (numPoints - 1);
+    //         const angle = (Math.PI / 2) - (t * Math.PI); 
+    //         const x = Math.cos(angle) * this.data.radius;
+    //         const y = Math.sin(angle) * this.data.radius;
+    //         points.push([x, y]);
+    //     }
+    //     return points;
+    // }
 
-    lathePoints(points, startAngle, endAngle, numDivisions, capStart, capEnd) {     
-        const positions = [];
-        // const texcoords = [];
-        const normals = [];
-        const indices = [];
+    // lathePoints(points, startAngle, endAngle, numDivisions, capStart, capEnd) {     
+    //     const positions = [];
+    //     // const texcoords = [];
+    //     const normals = [];
+    //     const indices = [];
 
-        const vOffset = capStart ? 1 : 0;
-        const pointsPerColumn = points.length + vOffset + (capEnd ? 1 : 0);
-        const quadsDown = pointsPerColumn - 1;
+    //     const vOffset = capStart ? 1 : 0;
+    //     const pointsPerColumn = points.length + vOffset + (capEnd ? 1 : 0);
+    //     const quadsDown = pointsPerColumn - 1;
 
-        for (let division = 0; division <= numDivisions; ++division) {
-            const u = division / numDivisions;
-            const angle = this.lerp(startAngle, endAngle, u);
-            const mat = m4.yRotation(angle);
+    //     for (let division = 0; division <= numDivisions; ++division) {
+    //         const u = division / numDivisions;
+    //         const angle = this.lerp(startAngle, endAngle, u);
+    //         const mat = m4.yRotation(angle);
 
-            if (capStart) {
-                const p = [0, points[0][1], 0];
-                const tp = m4.transformPoint(mat, p); 
-                positions.push(tp[0], tp[1], tp[2]);
-                // texcoords.push(u, 0);
+    //         if (capStart) {
+    //             const p = [0, points[0][1], 0];
+    //             const tp = m4.transformPoint(mat, p); 
+    //             positions.push(tp[0], tp[1], tp[2]);
+    //             // texcoords.push(u, 0);
 
-                const normal = twgl.v3.normalize(tp);
-                normals.push(normal[0], normal[1], normal[2]);
-            }
+    //             const normal = twgl.v3.normalize(tp);
+    //             normals.push(normal[0], normal[1], normal[2]);
+    //         }
 
-            points.forEach((p, ndx) => {
-                const tp = m4.transformPoint(mat, [...p, 0]);
-                positions.push(tp[0], tp[1], tp[2]);
+    //         points.forEach((p, ndx) => {
+    //             const tp = m4.transformPoint(mat, [...p, 0]);
+    //             positions.push(tp[0], tp[1], tp[2]);
                 
-                // const v = (ndx + vOffset) / quadsDown;
-                // texcoords.push(u, v);
+    //             // const v = (ndx + vOffset) / quadsDown;
+    //             // texcoords.push(u, v);
 
-                const normal = twgl.v3.normalize(tp);
-                normals.push(normal[0], normal[1], normal[2]);
-            });
+    //             const normal = twgl.v3.normalize(tp);
+    //             normals.push(normal[0], normal[1], normal[2]);
+    //         });
 
-            if (capEnd) {
-                const p = [0, points[points.length - 1][1], 0];
-                const tp = m4.transformPoint(mat, p);
-                positions.push(tp[0], tp[1], tp[2]);
-                // texcoords.push(u, 1);
+    //         if (capEnd) {
+    //             const p = [0, points[points.length - 1][1], 0];
+    //             const tp = m4.transformPoint(mat, p);
+    //             positions.push(tp[0], tp[1], tp[2]);
+    //             // texcoords.push(u, 1);
 
-                const normal = twgl.v3.normalize(tp);
-                normals.push(normal[0], normal[1], normal[2]);
-            }
-        }
+    //             const normal = twgl.v3.normalize(tp);
+    //             normals.push(normal[0], normal[1], normal[2]);
+    //         }
+    //     }
 
-        for (let division = 0; division < numDivisions; ++division) {
-            const column1Offset = division * pointsPerColumn;
-            const column2Offset = column1Offset + pointsPerColumn;
-            for (let quad = 0; quad < quadsDown; ++quad) {
-                indices.push(column1Offset + quad, column1Offset + quad + 1, column2Offset + quad);
-                indices.push(column1Offset + quad + 1, column2Offset + quad + 1, column2Offset + quad);
-            }
-        }
+    //     for (let division = 0; division < numDivisions; ++division) {
+    //         const column1Offset = division * pointsPerColumn;
+    //         const column2Offset = column1Offset + pointsPerColumn;
+    //         for (let quad = 0; quad < quadsDown; ++quad) {
+    //             indices.push(column1Offset + quad, column1Offset + quad + 1, column2Offset + quad);
+    //             indices.push(column1Offset + quad + 1, column2Offset + quad + 1, column2Offset + quad);
+    //         }
+    //     }
 
-        return {
-        position: positions,
-        // texcoord: texcoords,
-        normal: normals,
-        indices: indices,
-        };
-    }
+    //     return {
+    //     position: positions,
+    //     // texcoord: texcoords,
+    //     normal: normals,
+    //     indices: indices,
+    //     };
+    // }
 
     applyNoiseToSphere(positions, octaves = 1, frequency = 1.0, persistence = 0.5) {
         for (let i = 0; i < positions.length; i = i + 3) {
@@ -280,6 +280,69 @@ class Stone {
     }
 
     getStoneArrays(planetRadius) {
-        return twgl.primitives.createCubeVertices(this.getStoneCubeSize(planetRadius));
+        const stoneCubeSize = this.getStoneCubeSize(planetRadius);
+        let stoneArrays = twgl.primitives.createCubeVertices(stoneCubeSize);
+        twgl.primitives.reorientVertices(stoneArrays, m4.translation(0, stoneCubeSize / 5, 0));
+        return stoneArrays;
+    }
+}
+
+class Tree {
+    constructor() {
+        this.data = {
+            numberOfTrees: 50,
+            trunkHeightFactor: 0.2,
+            trunkRadiusFactor: 0.03,
+            foliageRadiusFactor: 0.1,
+            tempTreeScale: 1.0,
+            treeScale: 1.0,
+            minDistanceBetweenTrees: 0.3,
+            colorTrunk: [0.55, 0.27, 0.07, 1.0],
+            colorFoliage: [0.0, 0.5, 0.0, 1.0]
+        };
+    }
+    static get vs() {
+        return `#version 300 es
+        in vec4 a_position;
+        in vec3 a_normal;
+
+        uniform mat4 u_matrix;
+
+        out vec3 v_normal;
+
+        void main() {
+            gl_Position = u_matrix * a_position;
+            v_normal = a_normal;
+        }
+        `;
+    }
+
+    static get fs() {
+        return `#version 300 es
+        precision highp float;
+
+        in vec3 v_normal;
+
+        out vec4 out_color;
+
+        uniform vec4 u_color;
+
+        void main() {
+            out_color = u_color;
+        }
+        `;
+    }
+
+    getTrunkArrays(planetRadius) {
+        const trunkRadiuds = this.data.trunkRadiusFactor * planetRadius;
+        const trunkHeight = this.data.trunkHeightFactor * planetRadius;
+        let trunkArrays = twgl.primitives.createCylinderVertices(trunkRadiuds, trunkHeight, 12, 1);
+        trunkArrays = twgl.primitives.reorientVertices(trunkArrays, m4.translation(0, trunkHeight / 2, 0));
+        return trunkArrays;
+    }
+
+    getFoliageArrays(planetRadius) {
+        const foliageRadius = this.data.foliageRadiusFactor * planetRadius;
+        return twgl.primitives.createSphereVertices(foliageRadius, 12, 12);
     }
 }
