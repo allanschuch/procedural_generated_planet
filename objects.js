@@ -27,6 +27,8 @@ class Planet {
 
         this.uniforms = {};
         this.planetArrays = null;
+        this.planetMinAltitude = this.data.radius - this.data.noiseAmplitude;
+        this.planetMaxAltitude = this.data.radius + this.data.noiseAmplitude;
     }
 
     static get vs() {
@@ -91,11 +93,9 @@ class Planet {
     }
 
     getTerrainColorAltitude() {
-        const maxAltitude = this.data.radius + this.data.noiseAmplitude;
-        const minAltitude = this.data.radius - this.data.noiseAmplitude;
-        const waterAltitude = this.lerp(minAltitude, maxAltitude, this.data.waterAltitude);
-        const grassAltitude = this.lerp(minAltitude, maxAltitude, this.data.grassAltitude);
-        const rockAltitude = this.lerp(minAltitude, maxAltitude, this.data.rockAltitude);
+        const waterAltitude = this.getAltitude(this.data.waterAltitude);
+        const grassAltitude = this.getAltitude(this.data.grassAltitude);
+        const rockAltitude = this.getAltitude(this.data.rockAltitude);
         return {
             water: waterAltitude,
             grass: grassAltitude,
@@ -103,9 +103,19 @@ class Planet {
         };
     }
 
+    updateMinMaxAltitude() {
+        this.planetMinAltitude = this.data.radius - this.data.noiseAmplitude;
+        this.planetMaxAltitude = this.data.radius + this.data.noiseAmplitude;
+    }
+
+    getAltitude(altitudeFactor) {
+        return this.lerp(this.planetMinAltitude, this.planetMaxAltitude, altitudeFactor);
+    }
+
     update() {
         // const curvePoints = this.getSpherePoints(this.data.resolution);
-        
+        this.updateMinMaxAltitude();
+
         this.planetArrays = twgl.primitives.createSphereVertices(this.data.radius, this.data.divisions, this.data.resolution);
         
         this.planetArrays.position = this.applyNoiseToSphere(this.planetArrays.position, this.data.numberOfNoiseOctaves, this.data.noiseFrequency, this.data.noisePersistence);
@@ -225,83 +235,19 @@ class Planet {
     }
 }
 
-class Stone {
-    constructor() {        
-        this.data = {
-            numberOfStones: 175,
-            stoneCubeSize: 0,
-            tempStoneScale: 1.0,
-            stoneScale: 1.0,
-            minScaleFactor: 0.5,
-            maxScaleFactor: 2.0,
-            minDistanceBetweenStones: 0.2,
-            color: [0.7, 0.7, 0.8, 1.0]
-        };
-    }
-
-    static get vs() {
-        return `#version 300 es
-        in vec4 a_position;
-        in vec3 a_normal;
-
-        uniform mat4 u_matrix;
-
-        out vec3 v_normal;
-
-        void main() {
-            gl_Position = u_matrix * a_position;
-            v_normal = a_normal;
-        }
-        `;
-    }
-
-    static get fs() {
-        return `#version 300 es
-        precision highp float;
-
-        in vec3 v_normal;
-
-        out vec4 out_color;
-
-        uniform vec4 u_colorStone;
-
-        void main() {
-            out_color = u_colorStone;
-        }
-        `;
-    }
-    
-    getRandomScaleFactor() {
-        return Math.random() * (this.data.maxScaleFactor - this.data.minScaleFactor) + this.data.minScaleFactor;
-    }
-
-    getStoneCubeSize(planetRadius) {
-        return  planetRadius * 0.025;
-    }
-
-    getStoneArrays(planetRadius) {
-        const stoneCubeSize = this.getStoneCubeSize(planetRadius);
-        let stoneArrays = twgl.primitives.createCubeVertices(stoneCubeSize);
-        twgl.primitives.reorientVertices(stoneArrays, m4.translation(0, stoneCubeSize / 5, 0));
-        return stoneArrays;
-    }
-}
-
-class Tree {
+class PlanetObject {
     constructor() {
         this.data = {
-            numberOfTrees: 50,
-            trunkHeightFactor: 0.2,
-            trunkRadiusFactor: 0.03,
-            foliageRadiusFactor: 0.1,
-            tempTreeScale: 1.0,
-            treeScale: 1.0,
-            minDistanceBetweenTrees: 0.3,
-            colorTrunk: [0.55, 0.27, 0.07, 1.0],
-            colorFoliage: [0.0, 0.5, 0.0, 1.0]
+            numberOf: 25,
+            scale: 1.0,
+            tempScale: 1.0,
+            minScaleFactor: 0.5,
+            maxScaleFactor: 2.0,
+            minDistanceBetweenObjects: 1.4,
         };
     }
-    static get vs() {
+
+    getVS() {
         return `#version 300 es
         in vec4 a_position;
         in vec3 a_normal;
@@ -317,7 +263,7 @@ class Tree {
         `;
     }
 
-    static get fs() {
+    getFS() {
         return `#version 300 es
         precision highp float;
 
@@ -333,11 +279,58 @@ class Tree {
         `;
     }
 
+    getRandomScaleFactor() {
+        return Math.random() * (this.data.maxScaleFactor - this.data.minScaleFactor) + this.data.minScaleFactor;
+    }
+}
+
+class Stone extends PlanetObject {
+    constructor() {        
+        super();
+        this.data = {
+            ...this.data,
+            numberOf: 175,
+            stoneCubeSize: 0,
+            stoneNormalColor: [0.5, 0.5, 0.6, 1.0], 
+            stoneIceColor: [0.65, 0.95, 0.95, 1.0],
+            minDistanceBetweenObjects: 0.2,
+        };
+
+    }
+
+    getStoneCubeSize(planetRadius) {
+        return  planetRadius * 0.025;
+    }
+
+    getStoneArrays(planetRadius) {
+        const stoneCubeSize = this.getStoneCubeSize(planetRadius);
+        let stoneArrays = twgl.primitives.createCubeVertices(stoneCubeSize);
+        twgl.primitives.reorientVertices(stoneArrays, m4.translation(0, stoneCubeSize / 5, 0));
+        return stoneArrays;
+    }
+}
+
+class Tree extends PlanetObject {
+    constructor() {
+        super();
+        this.data = {
+            ...this.data,
+            trunkHeightFactor: 0.12,
+            trunkRadiusFactor: 0.015,
+            foliageRadiusFactor: 0.09,
+            trunkHeight: 0.2,
+            trunkRadius: 0.035,
+            trunkColor: [0.55, 0.27, 0.07, 1.0],
+            foliageNormalColor: [[0.698, 0.984, 0.647, 1.0], [1.0, 0.972, 0.721, 1.0], [0.949, 0.705, 0.639, 1.0]],
+            foliageIceColor: [0.8, 0.9, 1.0, 1.0],
+        };
+    }
+
     getTrunkArrays(planetRadius) {
-        const trunkRadiuds = this.data.trunkRadiusFactor * planetRadius;
-        const trunkHeight = this.data.trunkHeightFactor * planetRadius;
-        let trunkArrays = twgl.primitives.createCylinderVertices(trunkRadiuds, trunkHeight, 12, 1);
-        trunkArrays = twgl.primitives.reorientVertices(trunkArrays, m4.translation(0, trunkHeight / 2, 0));
+        this.data.trunkRadius = this.data.trunkRadiusFactor * planetRadius;
+        this.data.trunkHeight = this.data.trunkHeightFactor * planetRadius;
+        let trunkArrays = twgl.primitives.createCylinderVertices(this.data.trunkRadius, this.data.trunkHeight, 12, 1);
+        trunkArrays = twgl.primitives.reorientVertices(trunkArrays, m4.translation(0, this.data.trunkHeight / 2, 0));
         return trunkArrays;
     }
 
