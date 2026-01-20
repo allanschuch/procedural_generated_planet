@@ -219,6 +219,25 @@ function main() {
 
         objects.foliageGroups.push(foliageGroupNode);
     }
+
+    function getRotationMatrixFromUpToVector(targetVector, up = [0, 1, 0]) {
+        const normalizedUp = twgl.v3.normalize(up);
+        const normalizedTargetVector = twgl.v3.normalize(targetVector);
+        const axisToRotate = twgl.v3.cross(normalizedUp, normalizedTargetVector);
+        const axisLen = twgl.v3.length(axisToRotate);
+
+        if (axisLen < 1e-5) {
+            return m4.identity();
+        }
+
+        twgl.v3.normalize(axisToRotate, axisToRotate);
+
+        const rotationInRadians = twgl.v3.dot(normalizedUp, normalizedTargetVector);
+        const rotationAngle = Math.acos(Math.min(1, Math.max(-1, rotationInRadians)));
+
+        return m4.axisRotate(m4.identity(), axisToRotate, rotationAngle);
+}
+
     
 
     function updateTreesPlacement() {
@@ -247,26 +266,9 @@ function main() {
             treeNode.setParent(planetNode);
             generateTree(treeNode, position);
 
-            const normal = twgl.v3.normalize(position);
-            const up = [0, 1, 0];
-            let axis = twgl.v3.cross(up, normal);
-            const axisLen = twgl.v3.length(axis);
+            const rotationMatrix = getRotationMatrixFromUpToVector(position, [0,1,0]);
 
-            let rotationMatrix = m4.identity();
-
-            if (axisLen > 1e-5) {
-                axis = twgl.v3.normalize(axis);
-                const dot = twgl.v3.dot(up, normal);
-                const angle = Math.acos(Math.min(1, Math.max(-1, dot)));
-                rotationMatrix = m4.axisRotate(rotationMatrix, axis, angle);
-            }
-
-            // TRS
-            const translationMatrix = m4.translation(
-                position[0],
-                position[1],
-                position[2]
-            );
+            const translationMatrix = m4.translation(position[0], position[1], position[2]);
 
             let localMatrix = m4.multiply(translationMatrix, rotationMatrix);
             const scaleFactor = tree.data.scale;
