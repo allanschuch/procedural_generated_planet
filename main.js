@@ -44,6 +44,7 @@ function main() {
         stones: [],
         trees: [],
         trunks: [],
+        foliageGroups: [],
         foliages: []
     }
 
@@ -146,6 +147,44 @@ function main() {
         });
     }
 
+    function createFoliageGroup(foliageGroupNode, foliageColor) {
+        for (let i = 0; i < 5; i++) {
+            const foliageNode = new Node();
+            foliageNode.setParent(foliageGroupNode);
+            foliageNode.drawInfo = {
+                vertexArray: foliageVAO,
+                programInfo: treeProgramInfo,
+                bufferInfo: foliageBufferInfo,
+                uniforms: {
+                    u_color: foliageColor
+                }
+            };
+
+            const translateDist = tree.data.foliageRadiusFactor * planet.data.radius * 0.4;
+
+            switch(i) {
+                case 0:
+                    foliageNode.localMatrix = m4.translation(translateDist, 0, 0);
+                    break;
+                case 1:
+                    foliageNode.localMatrix = m4.translation(-translateDist, 0, 0);
+                    break;
+                case 2:
+                    foliageNode.localMatrix = m4.translation(0, 0, translateDist);
+                    break;
+                case 3:
+                    foliageNode.localMatrix = m4.translation(0, 0, -translateDist);
+                    break;
+                case 4:
+                    foliageNode.localMatrix = m4.translation(0, translateDist * 1.5, 0);
+                    break;
+            }
+
+            objects.foliages.push(foliageNode);
+        }
+
+    }
+
     function generateTree(treeNode, position){
         const treeAltitude = twgl.v3.length(position);
         const rockAltitude = planet.getAltitude(planet.data.rockAltitude);
@@ -172,36 +211,35 @@ function main() {
 
         objects.trunks.push(trunkNode);
 
-        const foliageNode = new Node();
-        foliageNode.setParent(treeNode);
-        foliageNode.drawInfo = {
-            vertexArray: foliageVAO,
-            programInfo: treeProgramInfo,
-            bufferInfo: foliageBufferInfo,
-            uniforms: {
-                u_color: foliageColor
-            },
-        };
+        const foliageGroupNode = new Node();
+        foliageGroupNode.setParent(treeNode);
+        createFoliageGroup(foliageGroupNode, foliageColor);
 
-        foliageNode.localMatrix = m4.translation(0, tree.data.trunkHeight * 1.5, 0);
+        foliageGroupNode.localMatrix = m4.translation(0, tree.data.trunkHeight * 1.5, 0);
 
-        objects.foliages.push(foliageNode);
+        objects.foliageGroups.push(foliageGroupNode);
     }
     
 
     function updateTreesPlacement() {
         objects.trees.forEach(tree => {
-            tree.children.forEach(child => child.setParent(null));
+            tree.children.forEach(child => {
+                child.children.forEach(grandChild => {
+                    grandChild.setParent(null);
+                });
+                child.setParent(null);
+            });
             tree.setParent(null);
         });
 
         objects.trees = [];
         objects.trunks = [];
         objects.foliages = [];
+        objects.foliageGroups = [];
 
         const planetNode = objects.planets[0];
         
-        const treePositions = generateRandomPositions(tree.data.numberOf, 1000, tree.data.minDistanceBetweenObjects, planet.data.waterAltitude, 1.0);
+        const treePositions = generateRandomPositions(tree.data.numberOf, 1000, tree.data.minDistanceBetweenObjects, planet.data.sandAltitude, planet.data.grassAltitude, planet.data.rockAltitude, 1.0);
         console.log(`Generated ${treePositions.length} trees.`);
         
         objects.trees = treePositions.map(position => {

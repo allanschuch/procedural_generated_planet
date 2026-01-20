@@ -15,7 +15,9 @@ class Planet {
             noiseAmplitude: 0.2,
             numberOfNoiseOctaves: 1,
             noisePersistence: 0.5,
+            windSpeed: 1.0,
             waterAltitude: 0.35,
+            sandAltitude: 0.365,
             grassAltitude: 0.55,
             rockAltitude: 0.7,
             waterColor: [0.0, 0.0, 1.0, 1.0],
@@ -59,6 +61,7 @@ class Planet {
         out vec4 out_color;
 
         uniform float u_waterAltitude;
+        uniform float u_sandAltitude;
         uniform float u_grassAltitude;
         uniform float u_rockAltitude;
 
@@ -72,7 +75,7 @@ class Planet {
             if (v_height < u_waterAltitude) {
                 out_color = u_colorWater;
             } 
-            else if (v_height < u_waterAltitude + 0.02) {
+            else if (v_height < u_sandAltitude) {
                 out_color = u_colorSand;
             }
             else if (v_height < u_grassAltitude) {
@@ -94,10 +97,12 @@ class Planet {
 
     getTerrainColorAltitude() {
         const waterAltitude = this.getAltitude(this.data.waterAltitude);
+        const sandAltitude = waterAltitude + 0.015;
         const grassAltitude = this.getAltitude(this.data.grassAltitude);
         const rockAltitude = this.getAltitude(this.data.rockAltitude);
         return {
             water: waterAltitude,
+            sand: sandAltitude,
             grass: grassAltitude,
             rock: rockAltitude
         };
@@ -125,8 +130,10 @@ class Planet {
 
     updateUniforms() {
         const terrainColorAltitude = this.getTerrainColorAltitude();
+        this.sandAltitude = terrainColorAltitude.sand;
         this.uniforms = {
             u_waterAltitude: terrainColorAltitude.water,
+            u_sandAltitude: terrainColorAltitude.sand,
             u_grassAltitude: terrainColorAltitude.grass,
             u_rockAltitude: terrainColorAltitude.rock,
             u_colorWater: this.data.waterColor,
@@ -315,14 +322,18 @@ class Tree extends PlanetObject {
         super();
         this.data = {
             ...this.data,
-            trunkHeightFactor: 0.12,
-            trunkRadiusFactor: 0.015,
-            foliageRadiusFactor: 0.09,
+            trunkHeightFactor: 0.10,
+            trunkRadiusFactor: 0.0127,
+            foliageRadiusFactor: 0.076,
             trunkHeight: 0.2,
             trunkRadius: 0.035,
             trunkColor: [0.55, 0.27, 0.07, 1.0],
-            foliageNormalColor: [[0.698, 0.984, 0.647, 1.0], [1.0, 0.972, 0.721, 1.0], [0.949, 0.705, 0.639, 1.0]],
-            foliageIceColor: [0.8, 0.9, 1.0, 1.0],
+            foliageNormalColor: [
+            [0.2, 0.8, 0.2, 1.0], 
+            [0.5, 0.9, 0.0, 1.0],
+            [0.0, 0.5, 0.1, 1.0]
+            ],
+            foliageIceColor: [0.9, 1.0, 1.0, 1.0],
         };
     }
 
@@ -336,6 +347,6 @@ class Tree extends PlanetObject {
 
     getFoliageArrays(planetRadius) {
         const foliageRadius = this.data.foliageRadiusFactor * planetRadius;
-        return twgl.primitives.createSphereVertices(foliageRadius, 12, 12);
+        return twgl.primitives.createSphereVertices(foliageRadius, 6, 6);
     }
 }
