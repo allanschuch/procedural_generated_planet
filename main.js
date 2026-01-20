@@ -39,6 +39,8 @@ function main() {
     let trunkBufferInfo = twgl.createBufferInfoFromArrays(gl, trunkArrays);
     let trunkVAO = twgl.createVAOFromBufferInfo(gl, treeProgramInfo, trunkBufferInfo);
 
+    // OBJECTS
+
     let objects = {
         planets: [planetNode],
         stones: [],
@@ -216,6 +218,7 @@ function main() {
         createFoliageGroup(foliageGroupNode, foliageColor);
 
         foliageGroupNode.localMatrix = m4.translation(0, tree.data.trunkHeight * 1.5, 0);
+        tree.data.originalFoliageLocalMatrix = foliageGroupNode.localMatrix;
 
         objects.foliageGroups.push(foliageGroupNode);
     }
@@ -237,8 +240,6 @@ function main() {
 
         return m4.axisRotate(m4.identity(), axisToRotate, rotationAngle);
 }
-
-    
 
     function updateTreesPlacement() {
         objects.trees.forEach(tree => {
@@ -283,43 +284,7 @@ function main() {
     function updateObjectsPlacement() {
         updateStonesPlacement();
         updateTreesPlacement();
-    }
-        
-
-    // function updateObjectsPlacement() {
-    //     objects.stones.forEach(stone => stone.setParent(null));
-    //     objects.stones = [];
-    //     const planetNode = objects.planets[0];
-        
-    //     const stonePositions = generateRandomPositions(stone.data.numberOf, 1000, stone.data.minDistanceBetweenObjects, planet.data.waterAltitude, 1.0);
-    //     console.log(`Generated ${stonePositions.length} stones.`);
-        
-    //     objects.stones = stonePositions.map(position => {
-    //         const stoneNode = new Node();
-    //         stoneNode.setParent(planetNode);
-    //         stoneNode.drawInfo = {
-    //             vertexArray: stoneVAO,       
-    //             programInfo: stoneProgramInfo,
-    //             bufferInfo: stoneBufferInfo,
-    //             uniforms: {
-    //                 u_color: stone.data.color
-    //             },
-    //         };
-
-    //         const normal = twgl.v3.normalize(position);
-    //         const look = m4.lookAt([0,0,0], normal, [0,1,0]);
-    //         const rotationMatrix = m4.inverse(look);
-    //         const translationMatrix = m4.translation(position[0], position[1], position[2]);
-    //         let localMatrix = m4.multiply(translationMatrix, rotationMatrix);
-    //         const scaleFactor = stone.getRandomScaleFactor() * stone.data.scale;
-    //         localMatrix = m4.scale(localMatrix, scaleFactor, scaleFactor, scaleFactor);
-
-    //         stoneNode.localMatrix = localMatrix;
-
-    //          return stoneNode;
-    //     });
-    // }
-            
+    }     
 
     function updatePlanet() {
         planet.update();
@@ -360,11 +325,15 @@ function main() {
         return m4.perspective(fov, aspect, 0.1, 100);
     }
 
+    function getAngleInRadians(degrees) {
+        return degrees * Math.PI / 180;
+    }
+
     webglLessonsUI.setupUI(document.querySelector("#ui-planet"), planet.data, [
         { type: "slider", key: "resolution", change: updatePlanet, min: 3, max: 300, precision: 0, name: "Resolution" },
         { type: "slider", key: "divisions", change: updatePlanet, min: 3, max: 300, precision: 0, name: "Divisions" },
         { type: "slider", key: "radius", change: updatePlanet, min: 0.5, max: 5.0, precision: 2, step: 0.1, name: "Radius" },
-        { type: "slider", key: "rotatingSpeed", change: updatePlanet, min: 1, max: 200, precision: 0, name: "Rotating Speed" },
+        { type: "slider", key: "rotationSpeed", change: updatePlanet, min: 0, max: 100, precision: 0, name: "Rotation Speed" },
         { type: "slider", key: "noiseType", change: updatePlanet, min: 0, max: 3, precision: 0, step: 1, name: "Noise Type" },
         { type: "slider", key: "noiseFrequency", change: updatePlanet, min: 0.1, max: 10.0, precision: 2, step: 0.05, name: "Noise Frequency" },
         { type: "slider", key: "noiseAmplitude", change: updatePlanet, min: 0.01, max: 3.0, precision: 2, step: 0.01, name: "Noise Amplitude" },
@@ -390,6 +359,7 @@ function main() {
         { type: "slider", key: "tempScale", change: updateTreeScale, min: 0.1, max: 3.0, precision: 2, step: 0.01, name: "Tree Scale" },
         { type: "slider", key: "numberOf", change: updateTreesPlacement, min: 1, max: 300, precision: 0, name: "Number of Trees" },
         { type: "slider", key: "minDistanceBetweenObjects", change: updateTreesPlacement, min: 0.01, max: 2.0, precision: 2, step: 0.01, name: "Min Distance Between Trees" },
+        { type: "slider", key: "windSpeed", min: 1, max: 100, precision: 0, step: 1, name: "Wind Speed" },
     ]);
 
     function updateObjects_u_matrixAndGetObjectsToDraw(viewProjectionMatrix) {
@@ -421,6 +391,35 @@ function main() {
         return drawables;
     }
 
+    // function updateFoliageAnimation(time) {
+    //     const windSpeed = tree.data.windSpeed;
+    //     const angle = Math.sin(time * 0.001) * tree.data.foliageSwingAngle * 0.003 * windSpeed;
+    //     objects.foliageGroups.forEach((foliageGroup) => {
+    //         foliageGroup.localMatrix = m4.multiply(foliageGroup.localMatrix, m4.yRotation(angle));
+    //     });
+    // }
+
+    function updateFoliageAnimation(deltaTime) {
+        let angle = (deltaTime * tree.data.windSpeed)
+        const foliageSwingAngleAcc = tree.data.foliageSwingAngleAcc + angle;
+        if (foliageSwingAngleAcc < tree.data.foliageMaxSwingAngle) tree.data.foliageSwingAngleAcc = foliageSwingAngleAcc;
+        else {
+            angle = tree.data.foliageMaxSwingAngle - tree.data.foliageSwingAngleAcc;
+            tree.data.foliageSwingAngleAcc = 0.0;
+            tree.data.foliageSwingDirection *= -1;
+        }
+        const angleInRadians = getAngleInRadians(angle); 
+        objects.foliageGroups.forEach((foliageGroup, index) => {
+            if (index % 2 === 0) {
+                foliageGroup.localMatrix = m4.zRotate(foliageGroup.localMatrix, angleInRadians * tree.data.foliageSwingDirection)
+            } else {
+                foliageGroup.localMatrix = m4.zRotate(foliageGroup.localMatrix, angleInRadians * tree.data.foliageSwingDirection * (-1))
+            }
+        });
+    }
+
+    let lastTime = 0;
+
     function drawScene(time) {
         time *= 0.001;
         twgl.resizeCanvasToDisplaySize(gl.canvas);
@@ -433,7 +432,12 @@ function main() {
         const viewMatrix = m4.inverse(cameraMatrix);
         const viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
 
-        m4.yRotation(time * planet.data.rotatingSpeed * 0.02 || 0, planetNode.localMatrix);
+        const deltaTime = time - lastTime;
+        lastTime = time;
+
+        updateFoliageAnimation(deltaTime);
+
+        m4.yRotation(time * planet.data.rotationSpeed * 0.02 || 0, planetNode.localMatrix);
         
         planetNode.updateWorldMatrix();
         

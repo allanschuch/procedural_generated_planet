@@ -9,13 +9,12 @@ class Planet {
             resolution: 100,
             divisions: 100,
             radius: 1.0,
-            rotatingSpeed: 50,
+            rotationSpeed: 10,
             noiseType: 0,
             noiseFrequency: 1.0,
             noiseAmplitude: 0.2,
             numberOfNoiseOctaves: 1,
             noisePersistence: 0.5,
-            windSpeed: 1.0,
             waterAltitude: 0.35,
             sandAltitude: 0.365,
             grassAltitude: 0.55,
@@ -334,6 +333,11 @@ class Tree extends PlanetObject {
             [0.0, 0.5, 0.1, 1.0]
             ],
             foliageIceColor: [0.9, 1.0, 1.0, 1.0],
+            foliageMaxSwingAngle: 15.0,
+            foliageSwingAngleAcc: 0.0,
+            foliageSwingDirection: 1,
+            originalFoliageLocalMatrix: null,
+            windSpeed: 30
         };
     }
 
