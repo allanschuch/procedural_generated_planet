@@ -88,11 +88,6 @@ class Planet {
                 out_color = u_colorSnow;
             }
         }
-
-        void main() {
-            vec3 normalizedNormal = normalize(v_normal);
-            out_color = vec4(normalizedNormal * 0.5 + 0.5, 1.0);
-        }
         `;
         
     }
