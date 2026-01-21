@@ -37,14 +37,15 @@ class Planet {
         in vec4 a_position;
         in vec3 a_normal;
 
-        uniform mat4 u_matrix;
+        uniform mat4 u_inverseTransposedWorldMatrix;
+        uniform mat4 u_worldViewProjectionMatrix;
 
         out vec3 v_normal;
         out float v_height;
 
         void main() {
-            gl_Position = u_matrix * a_position;
-            v_normal = a_normal;
+            gl_Position = u_worldViewProjectionMatrix * a_position;
+            v_normal = a_normal * mat3(u_inverseTransposedWorldMatrix);
             v_height = length(a_position.xyz);
         }
         `;
@@ -87,7 +88,13 @@ class Planet {
                 out_color = u_colorSnow;
             }
         }
+
+        void main() {
+            vec3 normalizedNormal = normalize(v_normal);
+            out_color = vec4(normalizedNormal * 0.5 + 0.5, 1.0);
+        }
         `;
+        
     }
 
     lerp(a, b, t) {
@@ -258,13 +265,14 @@ class PlanetObject {
         in vec4 a_position;
         in vec3 a_normal;
 
-        uniform mat4 u_matrix;
+        uniform mat4 u_inverseTransposedWorldMatrix;
+        uniform mat4 u_worldViewProjectionMatrix;
 
         out vec3 v_normal;
 
         void main() {
-            gl_Position = u_matrix * a_position;
-            v_normal = a_normal;
+            gl_Position = u_worldViewProjectionMatrix * a_position;
+            v_normal = a_normal * mat3(u_inverseTransposedWorldMatrix);
         }
         `;
     }
@@ -280,6 +288,7 @@ class PlanetObject {
         uniform vec4 u_color;
 
         void main() {
+            vec3 normalizedNormal = normalize(v_normal);
             out_color = u_color;
         }
         `;
@@ -371,13 +380,14 @@ class Star {
         in vec4 a_position;
         in vec3 a_normal;
 
-        uniform mat4 u_matrix;
+        uniform mat4 u_inverseTransposedWorldMatrix;
+        uniform mat4 u_worldViewProjectionMatrix;
 
         out vec3 v_normal;
 
         void main() {
-            gl_Position = u_matrix * a_position;
-            v_normal = a_normal;
+            gl_Position = u_worldViewProjectionMatrix * a_position;
+            v_normal = a_normal * mat3(u_inverseTransposedWorldMatrix);
         }
         `;
     }
