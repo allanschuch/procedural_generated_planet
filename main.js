@@ -320,9 +320,7 @@ function main() {
             starBufferInfo.numElements = starArrays.indices.length;
         }
 
-        starNode.drawInfo.uniforms = {
-            u_color: star.data.color
-        };
+        starNode.drawInfo.uniforms.u_color = star.data.color;
 
         const treeFoliageHeight = tree.data.foliageRadiusFactor * planet.data.radius * tree.data.scale;
         const treeTrunkHeight = tree.data.trunkHeightFactor * planet.data.radius * tree.data.scale;
@@ -330,6 +328,10 @@ function main() {
         const distanceFromPlanet = star.data.distanceFromPlanetFactor * planet.data.radius + planetRadiusWithTrees;
         starNode.localMatrix = m4.identity();
         starNode.localMatrix = m4.translate(starNode.localMatrix, -distanceFromPlanet, 0, 0);
+    }
+
+    function updateNoisePersitence() {
+        if (planet.data.numberOfNoiseOctaves > 1) updatePlanet();
     }
 
     function updatePlanet() {
@@ -383,7 +385,7 @@ function main() {
         { type: "slider", key: "noiseFrequency", change: updatePlanet, min: 0.1, max: 10.0, precision: 2, step: 0.05, name: "Noise Frequency" },
         { type: "slider", key: "noiseAmplitude", change: updatePlanet, min: 0.01, max: 3.0, precision: 2, step: 0.01, name: "Noise Amplitude" },
         { type: "slider", key: "numberOfNoiseOctaves", change: updatePlanet, min: 1, max: 5, precision: 0, name: "Number of Noise Octaves" },
-        { type: "slider", key: "noisePersistence", change: updatePlanet, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Noise Persistence" },
+        { type: "slider", key: "noisePersistence", change: updateNoisePersitence, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Noise Persistence" },
         { type: "slider", key: "waterAltitude", change: updatePlanet, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Water Altitude" },
         { type: "slider", key: "grassAltitude", change: updatePlanet, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Grass Altitude" },
         { type: "slider", key: "rockAltitude", change: updatePlanet, min: 0.0, max: 1.0, precision: 2, step: 0.01, name: "Rock Altitude" },
@@ -396,19 +398,19 @@ function main() {
 
     webglLessonsUI.setupUI(document.querySelector("#ui-stones"), stone.data, [
         { type: "slider", key: "tempScale", change: updateStoneScale, min: 0.1, max: 3.0, precision: 2, step: 0.01, name: "Stone Scale" },
-        { type: "slider", key: "numberOf", change: updateStonesPlacement, min: 1, max: 500, precision: 0, name: "Number of Stones" },
+        { type: "slider", key: "numberOf", change: updateStonesPlacement, min: 0, max: 500, precision: 0, name: "Number of Stones" },
         { type: "slider", key: "minDistanceBetweenObjects", change: updateStonesPlacement, min: 0.01, max: 1.0, precision: 2, step: 0.01, name: "Min Distance Between Stones" },
     ]);
 
     webglLessonsUI.setupUI(document.querySelector("#ui-trees"), tree.data, [
         { type: "slider", key: "tempScale", change: updateTreeScale, min: 0.1, max: 3.0, precision: 2, step: 0.01, name: "Tree Scale" },
-        { type: "slider", key: "numberOf", change: updateTreesPlacement, min: 1, max: 300, precision: 0, name: "Number of Trees" },
+        { type: "slider", key: "numberOf", change: updateTreesPlacement, min: 0, max: 300, precision: 0, name: "Number of Trees" },
         { type: "slider", key: "minDistanceBetweenObjects", change: updateTreesPlacement, min: 0.01, max: 2.0, precision: 2, step: 0.01, name: "Min Distance Between Trees" },
         { type: "slider", key: "windSpeed", min: 1, max: 100, precision: 0, step: 1, name: "Wind Speed" },
     ]);
 
     webglLessonsUI.setupUI(document.querySelector("#ui-star"), star.data, [
-        { type: "slider", key: "distanceFromPlanetFactor", change: updateStar, min: 0.1, max: 2.0, precision: 2, step: 0.1, name: "Distance from Planet Factor" },
+        { type: "slider", key: "distanceFromPlanetFactor", change: updateStar, min: 0.1, max: 3.0, precision: 2, step: 0.1, name: "Distance from Planet Factor" },
         { type: "slider", key: "orbitSpeed", min: 0, max: 100, precision: 0, name: "Orbit Speed" },
     ]);
 
@@ -418,8 +420,12 @@ function main() {
         Object.keys(objects).forEach(objectType => {
             objects[objectType].forEach(object => {
                 if (!object.drawInfo.programInfo) return;
+                object.drawInfo.uniforms.u_worldMatrix = object.worldMatrix;
+                object.drawInfo.uniforms.u_viewProjectionMatrix = viewProjectionMatrix;
                 object.drawInfo.uniforms.u_inverseTransposedWorldMatrix = m4.transpose(m4.inverse(object.worldMatrix));
-                object.drawInfo.uniforms.u_worldViewProjectionMatrix = m4.multiply(viewProjectionMatrix, object.worldMatrix);
+                const lightWorldPosition = starNode.worldMatrix.slice(12, 15);
+                object.drawInfo.uniforms.u_lightWorldPosition = lightWorldPosition;
+                object.drawInfo.uniforms.u_ambientLight = star.data.ambientLight;
                 drawables.push(object.drawInfo);
             });
         });

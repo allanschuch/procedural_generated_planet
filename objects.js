@@ -37,16 +37,31 @@ class Planet {
         in vec4 a_position;
         in vec3 a_normal;
 
+        uniform mat4 u_worldMatrix;
+        uniform mat4 u_viewProjectionMatrix;
         uniform mat4 u_inverseTransposedWorldMatrix;
-        uniform mat4 u_worldViewProjectionMatrix;
+
+        uniform vec3 u_lightWorldPosition;
 
         out vec3 v_normal;
         out float v_height;
+        out vec3 v_surfaceToLight;
 
         void main() {
-            gl_Position = u_worldViewProjectionMatrix * a_position;
-            v_normal = a_normal * mat3(u_inverseTransposedWorldMatrix);
+            // Multiply the position by the matrix.
+            gl_Position = u_viewProjectionMatrix * u_worldMatrix * a_position;
+
+            // orient the normals and pass to the fragment shader
+            v_normal = mat3(u_inverseTransposedWorldMatrix) * a_normal;
+
             v_height = length(a_position.xyz);
+
+            // compute the world position of the surface
+            vec3 surfaceWorldPosition = (u_worldMatrix * a_position).xyz;
+            
+            // compute the vector of the surface to the light
+            // and pass it to the fragment shader
+            v_surfaceToLight = u_lightWorldPosition - surfaceWorldPosition;
         }
         `;
     }
@@ -56,37 +71,42 @@ class Planet {
         precision highp float;
 
         in vec3 v_normal;
+        in vec3 v_surfaceToLight;
         in float v_height;
 
-        out vec4 out_color;
-
+        uniform float u_ambientLight;
+        
         uniform float u_waterAltitude;
         uniform float u_sandAltitude;
         uniform float u_grassAltitude;
         uniform float u_rockAltitude;
-
+        
         uniform vec4 u_colorWater;
         uniform vec4 u_colorSand;
         uniform vec4 u_colorGrass;
         uniform vec4 u_colorRock;
         uniform vec4 u_colorSnow;
+        
+        out vec4 out_color;
 
         void main() {
-            if (v_height < u_waterAltitude) {
-                out_color = u_colorWater;
-            } 
-            else if (v_height < u_sandAltitude) {
-                out_color = u_colorSand;
-            }
-            else if (v_height < u_grassAltitude) {
-                out_color = u_colorGrass;
-            }
-            else if (v_height < u_rockAltitude) {
-                out_color = u_colorRock;
-            }
-            else {
-                out_color = u_colorSnow;
-            }
+            // because v_normal is a varying it's interpolated
+            // so it will not be a unit vector. Normalizing it
+            // will make it a unit vector again
+            vec3 normal = normalize(v_normal);
+
+            vec3 surfaceToLightDirection = normalize(v_surfaceToLight);
+
+            float diffuseLight = max(dot(normal, surfaceToLightDirection), 0.0);
+            float light = diffuseLight + u_ambientLight;
+
+            out_color = step(v_height, u_waterAltitude) * u_colorWater +
+                        step(u_waterAltitude, v_height) * step(v_height, u_sandAltitude) * u_colorSand +
+                        step(u_sandAltitude, v_height) * step(v_height, u_grassAltitude) * u_colorGrass +
+                        step(u_grassAltitude, v_height) * step(v_height, u_rockAltitude) * u_colorRock +
+                        step(u_rockAltitude, v_height) * u_colorSnow;
+
+            out_color.rgb *= light;
         }
         `;
         
@@ -260,14 +280,31 @@ class PlanetObject {
         in vec4 a_position;
         in vec3 a_normal;
 
+        uniform mat4 u_worldMatrix;
+        uniform mat4 u_viewProjectionMatrix;
         uniform mat4 u_inverseTransposedWorldMatrix;
-        uniform mat4 u_worldViewProjectionMatrix;
+
+        uniform vec3 u_lightWorldPosition;
 
         out vec3 v_normal;
+        out float v_height;
+        out vec3 v_surfaceToLight;
 
         void main() {
-            gl_Position = u_worldViewProjectionMatrix * a_position;
-            v_normal = a_normal * mat3(u_inverseTransposedWorldMatrix);
+            // Multiply the position by the matrix.
+            gl_Position = u_viewProjectionMatrix * u_worldMatrix * a_position;
+
+            // orient the normals and pass to the fragment shader
+            v_normal = mat3(u_inverseTransposedWorldMatrix) * a_normal;
+
+            v_height = length(a_position.xyz);
+
+            // compute the world position of the surface
+            vec3 surfaceWorldPosition = (u_worldMatrix * a_position).xyz;
+            
+            // compute the vector of the surface to the light
+            // and pass it to the fragment shader
+            v_surfaceToLight = u_lightWorldPosition - surfaceWorldPosition;
         }
         `;
     }
@@ -277,16 +314,32 @@ class PlanetObject {
         precision highp float;
 
         in vec3 v_normal;
+        in vec3 v_surfaceToLight;
+        in float v_height;
 
+        uniform float u_ambientLight;
+        
+        uniform vec4 u_color;
+        
         out vec4 out_color;
 
-        uniform vec4 u_color;
-
         void main() {
-            vec3 normalizedNormal = normalize(v_normal);
+            // because v_normal is a varying it's interpolated
+            // so it will not be a unit vector. Normalizing it
+            // will make it a unit vector again
+            vec3 normal = normalize(v_normal);
+
+            vec3 surfaceToLightDirection = normalize(v_surfaceToLight);
+
+            float diffuseLight = max(dot(normal, surfaceToLightDirection), 0.0);
+            float light = diffuseLight + u_ambientLight;
+
             out_color = u_color;
+
+            out_color.rgb *= light;
         }
         `;
+        
     }
 
     getRandomScaleFactor() {
@@ -362,11 +415,12 @@ class Tree extends PlanetObject {
 class Star {
     constructor() {
         this.data = {
-            starRadiusFactor: 0.2,
+            starRadiusFactor: 0.3,
             orbitSpeed: 5,
-            distanceFromPlanetFactor: 1,
+            distanceFromPlanetFactor: 1.5,
             lightIntensity: 1.0,
             color: [1.0, 1.0, 0.8, 1.0],
+            ambientLight: 0.3
         };
     }
 
@@ -375,13 +429,14 @@ class Star {
         in vec4 a_position;
         in vec3 a_normal;
 
+        uniform mat4 u_worldMatrix;
+        uniform mat4 u_viewProjectionMatrix;
         uniform mat4 u_inverseTransposedWorldMatrix;
-        uniform mat4 u_worldViewProjectionMatrix;
 
         out vec3 v_normal;
 
         void main() {
-            gl_Position = u_worldViewProjectionMatrix * a_position;
+            gl_Position = u_viewProjectionMatrix * u_worldMatrix * a_position;
             v_normal = a_normal * mat3(u_inverseTransposedWorldMatrix);
         }
         `;
