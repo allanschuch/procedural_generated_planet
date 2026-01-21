@@ -414,41 +414,16 @@ function main() {
 
     function updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix) {
         const drawables = [];
-        objects.planets.forEach(planet => {
-            if (planet.drawInfo) {
-                planet.drawInfo.uniforms.u_inverseTransposedWorldMatrix = m4.transpose(m4.inverse(planet.worldMatrix));
-                planet.drawInfo.uniforms.u_worldViewProjectionMatrix = m4.multiply(viewProjectionMatrix, planet.worldMatrix);
-                drawables.push(planet.drawInfo);
-            }
+
+        Object.keys(objects).forEach(objectType => {
+            objects[objectType].forEach(object => {
+                if (!object.drawInfo.programInfo) return;
+                object.drawInfo.uniforms.u_inverseTransposedWorldMatrix = m4.transpose(m4.inverse(object.worldMatrix));
+                object.drawInfo.uniforms.u_worldViewProjectionMatrix = m4.multiply(viewProjectionMatrix, object.worldMatrix);
+                drawables.push(object.drawInfo);
+            });
         });
-        objects.stones.forEach(stone => {
-            if (stone.drawInfo) {
-                stone.drawInfo.uniforms.u_inverseTransposedWorldMatrix = m4.transpose(m4.inverse(stone.worldMatrix));
-                stone.drawInfo.uniforms.u_worldViewProjectionMatrix = m4.multiply(viewProjectionMatrix, stone.worldMatrix);
-                drawables.push(stone.drawInfo);
-            }
-        });
-        objects.trunks.forEach(trunk => {
-            if (trunk.drawInfo) {
-                trunk.drawInfo.uniforms.u_inverseTransposedWorldMatrix = m4.transpose(m4.inverse(trunk.worldMatrix));
-                trunk.drawInfo.uniforms.u_worldViewProjectionMatrix = m4.multiply(viewProjectionMatrix, trunk.worldMatrix);
-                drawables.push(trunk.drawInfo);
-            }
-        });
-        objects.foliages.forEach(foliage => {
-            if (foliage.drawInfo) {
-                foliage.drawInfo.uniforms.u_inverseTransposedWorldMatrix = m4.transpose(m4.inverse(foliage.worldMatrix));
-                foliage.drawInfo.uniforms.u_worldViewProjectionMatrix = m4.multiply(viewProjectionMatrix, foliage.worldMatrix);
-                drawables.push(foliage.drawInfo);
-            }
-        });
-        objects.stars.forEach(star => {
-            if (star.drawInfo) {
-                star.drawInfo.uniforms.u_inverseTransposedWorldMatrix = m4.transpose(m4.inverse(star.worldMatrix));
-                star.drawInfo.uniforms.u_worldViewProjectionMatrix = m4.multiply(viewProjectionMatrix, star.worldMatrix);
-                drawables.push(star.drawInfo);
-            }
-        });
+        
         return drawables;
     }
 
