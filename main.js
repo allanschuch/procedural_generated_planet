@@ -6,15 +6,31 @@ function main() {
     if (!gl) return;
     twgl.setDefaults({attribPrefix: "a_"});
 
-    // PLANET CONFIG
+    // PLANET AND STAR CONFIG
 
     const planet = new Planet();
 
-    const planetProgramInfo = twgl.createProgramInfo(gl, [Planet.vs, Planet.fs]);
+    const planetProgramInfo = twgl.createProgramInfo(gl, [planet.getVS(), planet.getFS()]);
     let planetBufferInfo = null;
     let planetVAO = null;
     const planetNode = new Node();
     planetNode.localMatrix = m4.identity();
+
+    const star = new Star();
+
+    const starProgramInfo = twgl.createProgramInfo(gl, [star.getVS(), star.getFS()]);
+    let starBufferInfo = null;
+    let starVAO = null;
+    const starNode = new Node();
+    starNode.localMatrix = m4.identity();
+
+    const starOrbitNode = new Node();
+    starOrbitNode.localMatrix = m4.identity();
+    starNode.setParent(starOrbitNode);
+
+    const systemNode = new Node();
+    planetNode.setParent(systemNode);
+    starOrbitNode.setParent(systemNode);
 
     // STONES CONFIG
 
@@ -47,7 +63,9 @@ function main() {
         trees: [],
         trunks: [],
         foliageGroups: [],
-        foliages: []
+        foliages: [],
+        stars: [starNode],
+        systems: [systemNode]
     }
 
     function updateStoneScale(){
@@ -284,7 +302,35 @@ function main() {
     function updateObjectsPlacement() {
         updateStonesPlacement();
         updateTreesPlacement();
-    }     
+    } 
+    
+    function updateStar() {
+        const starArrays = star.getStarArrays(planet.data.radius);
+        if (!starBufferInfo) {
+            starBufferInfo = twgl.createBufferInfoFromArrays(gl, starArrays);
+            starVAO = twgl.createVAOFromBufferInfo(gl, starProgramInfo, starBufferInfo);
+            starNode.drawInfo.vertexArray = starVAO;
+            starNode.drawInfo.programInfo = starProgramInfo;
+            starNode.drawInfo.bufferInfo = starBufferInfo;
+        } else {
+            twgl.setAttribInfoBufferFromArray(gl, starBufferInfo.attribs.a_position, starArrays.position);
+            twgl.setAttribInfoBufferFromArray(gl, starBufferInfo.attribs.a_normal, starArrays.normal);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, starBufferInfo.indices);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(starArrays.indices), gl.STATIC_DRAW);
+            starBufferInfo.numElements = starArrays.indices.length;
+        }
+
+        starNode.drawInfo.uniforms = {
+            u_color: star.data.color
+        };
+
+        const treeFoliageHeight = tree.data.foliageRadiusFactor * planet.data.radius * tree.data.scale;
+        const treeTrunkHeight = tree.data.trunkHeightFactor * planet.data.radius * tree.data.scale;
+        const planetRadiusWithTrees = planet.data.radius + planet.data.noiseAmplitude + treeFoliageHeight + treeTrunkHeight;
+        const distanceFromPlanet = star.data.distanceFromPlanetFactor * planet.data.radius + planetRadiusWithTrees;
+        starNode.localMatrix = m4.identity();
+        starNode.localMatrix = m4.translate(starNode.localMatrix, -distanceFromPlanet, 0, 0);
+    }
 
     function updatePlanet() {
         planet.update();
@@ -293,7 +339,6 @@ function main() {
             planetVAO = twgl.createVAOFromBufferInfo(gl, planetProgramInfo, planetBufferInfo);
             planetNode.drawInfo.vertexArray = planetVAO;
             planetNode.drawInfo.programInfo = planetProgramInfo;
-            planetNode.drawInfo.uniforms = planet.uniforms;
             planetNode.drawInfo.bufferInfo = planetBufferInfo;
         } else {
             twgl.setAttribInfoBufferFromArray(gl, planetBufferInfo.attribs.a_position, planet.planetArrays.position);
@@ -301,15 +346,15 @@ function main() {
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, planetBufferInfo.indices);
             gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(planet.planetArrays.indices), gl.STATIC_DRAW);
             planetBufferInfo.numElements = planet.planetArrays.indices.length;
-
-            planetNode.drawInfo.uniforms = planet.uniforms;
         }
+        planetNode.drawInfo.uniforms = planet.uniforms;
         updateObjectsPlacement();
+        updateStar();
     }
     
     updatePlanet();
 
-    const cameraData = { radius: 7.5, fov: 45 };
+    const cameraData = { radius: 10, fov: 45 };
 
     function setCameraMatrix() {
         const cameraRadius = cameraData.radius;
@@ -333,7 +378,7 @@ function main() {
         { type: "slider", key: "resolution", change: updatePlanet, min: 3, max: 300, precision: 0, name: "Resolution" },
         { type: "slider", key: "divisions", change: updatePlanet, min: 3, max: 300, precision: 0, name: "Divisions" },
         { type: "slider", key: "radius", change: updatePlanet, min: 0.5, max: 5.0, precision: 2, step: 0.1, name: "Radius" },
-        { type: "slider", key: "rotationSpeed", change: updatePlanet, min: 0, max: 100, precision: 0, name: "Rotation Speed" },
+        { type: "slider", key: "rotationSpeed", min: 0, max: 100, precision: 0, name: "Rotation Speed" },
         { type: "slider", key: "noiseType", change: updatePlanet, min: 0, max: 3, precision: 0, step: 1, name: "Noise Type" },
         { type: "slider", key: "noiseFrequency", change: updatePlanet, min: 0.1, max: 10.0, precision: 2, step: 0.05, name: "Noise Frequency" },
         { type: "slider", key: "noiseAmplitude", change: updatePlanet, min: 0.01, max: 3.0, precision: 2, step: 0.01, name: "Noise Amplitude" },
@@ -362,6 +407,11 @@ function main() {
         { type: "slider", key: "windSpeed", min: 1, max: 100, precision: 0, step: 1, name: "Wind Speed" },
     ]);
 
+    webglLessonsUI.setupUI(document.querySelector("#ui-star"), star.data, [
+        { type: "slider", key: "distanceFromPlanetFactor", change: updateStar, min: 0.1, max: 2.0, precision: 2, step: 0.1, name: "Distance from Planet Factor" },
+        { type: "slider", key: "orbitSpeed", min: 0, max: 100, precision: 0, name: "Orbit Speed" },
+    ]);
+
     function updateObjects_u_matrixAndGetObjectsToDraw(viewProjectionMatrix) {
         const drawables = [];
         objects.planets.forEach(planet => {
@@ -386,6 +436,12 @@ function main() {
             if (foliage.drawInfo) {
                 foliage.drawInfo.uniforms.u_matrix = m4.multiply(viewProjectionMatrix, foliage.worldMatrix);
                 drawables.push(foliage.drawInfo);
+            }
+        });
+        objects.stars.forEach(star => {
+            if (star.drawInfo) {
+                star.drawInfo.uniforms.u_matrix = m4.multiply(viewProjectionMatrix, star.worldMatrix);
+                drawables.push(star.drawInfo);
             }
         });
         return drawables;
@@ -438,8 +494,9 @@ function main() {
         updateFoliageAnimation(deltaTime);
 
         m4.yRotation(time * planet.data.rotationSpeed * 0.02 || 0, planetNode.localMatrix);
+        m4.yRotation(time * star.data.orbitSpeed * -0.02 || 0, starOrbitNode.localMatrix);
         
-        planetNode.updateWorldMatrix();
+        systemNode.updateWorldMatrix();
         
         const objectsToDraw = updateObjects_u_matrixAndGetObjectsToDraw(viewProjectionMatrix);
     

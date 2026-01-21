@@ -32,7 +32,7 @@ class Planet {
         this.planetMaxAltitude = this.data.radius + this.data.noiseAmplitude;
     }
 
-    static get vs() {
+    getVS() {
         return `#version 300 es
         in vec4 a_position;
         in vec3 a_normal;
@@ -50,7 +50,7 @@ class Planet {
         `;
     }
 
-    static get fs() {
+    getFS() {
         return `#version 300 es
         precision highp float;
 
@@ -352,5 +352,54 @@ class Tree extends PlanetObject {
     getFoliageArrays(planetRadius) {
         const foliageRadius = this.data.foliageRadiusFactor * planetRadius;
         return twgl.primitives.createSphereVertices(foliageRadius, 6, 6);
+    }
+}
+
+class Star {
+    constructor() {
+        this.data = {
+            starRadiusFactor: 0.2,
+            orbitSpeed: 5,
+            distanceFromPlanetFactor: 1,
+            lightIntensity: 1.0,
+            color: [1.0, 1.0, 0.8, 1.0],
+        };
+    }
+
+    getVS() {
+        return `#version 300 es
+        in vec4 a_position;
+        in vec3 a_normal;
+
+        uniform mat4 u_matrix;
+
+        out vec3 v_normal;
+
+        void main() {
+            gl_Position = u_matrix * a_position;
+            v_normal = a_normal;
+        }
+        `;
+    }
+
+    getFS() {
+        return `#version 300 es
+        precision highp float;
+
+        in vec3 v_normal;
+
+        out vec4 out_color;
+
+        uniform vec4 u_color;
+
+        void main() {
+            out_color = u_color;
+        }
+        `;
+    }
+
+    getStarArrays(planetRadius, treefoliageRadiusFactor, treeTrunkHeightFactor, treeScale) {
+        const starRadius = this.data.starRadiusFactor * planetRadius;
+        return twgl.primitives.createSphereVertices(starRadius, 12, 12);
     }
 }
