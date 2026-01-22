@@ -205,7 +205,6 @@ function main() {
 
             objects.foliages.push(foliageNode);
         }
-
     }
 
     function generateTree(treeNode, position){
@@ -213,7 +212,7 @@ function main() {
         const rockAltitude = planet.getAltitude(planet.data.rockAltitude);
         let foliageColor;
         if (treeAltitude > rockAltitude) {
-            foliageColor = tree.data.foliageIceColor;
+            foliageColor = planet.data.snowColor;
         } else {
             const randomIndex = Math.floor(Math.random() * 3)
             foliageColor = tree.data.foliageNormalColor[randomIndex];
@@ -359,18 +358,49 @@ function main() {
         updateStar();
     }
 
-    function updateLightAndColor() {
-        updateStar();
+
+    function updateLight() {
+        const shininessFactor = star.data.generalShininessFactor;
+        objects.stones.forEach(stoneNode => 
+            stoneNode.drawInfo.uniforms.u_shininess = stoneNode.drawInfo.uniforms.u_color === stone.data.stoneNormalColor ? 
+            stone.data.shininess * shininessFactor : stone.data.shininess / 2 * shininessFactor);
+        
+        objects.trunks.forEach(trunkNode =>
+            trunkNode.drawInfo.uniforms.u_shininess = tree.data.shininess * shininessFactor);
+       
+        foliageNodes.forEach(foliageNode => {
+            foliageNode.drawInfo.uniforms.u_shininess = tree.data.shininess * shininessFactor
+        });
+    }
+
+    function updateColors() {
         planet.update();
+        planetNode.drawInfo.uniforms = planet.uniforms;
+
+        starNode.drawInfo.uniforms.u_color = star.data.color;
+       
+        let randomIndex = 0;
+        objects.foliageGroups.forEach(foliageGroupNode => {
+            randomIndex = Math.floor(Math.random() * 3);
+            foliageGroupNode.children.forEach(foliageNode => {
+                foliageNode.drawInfo.uniforms.u_color = foliageNode.drawInfo.uniforms.u_color === planet.data.snowColor ?
+                planet.data.snowColor :
+                tree.data.foliageNormalColor[randomIndex];
+            });
+        });
     }
     
     updatePlanet();
 
-    const cameraData = { radius: 10, fov: 45 };
+    const cameraData = { zoom: 10, fov: 45, angle: 0, height: 0};
 
     function setCameraMatrix() {
-        const cameraRadius = cameraData.radius;
-        const cameraPosition = [0, 0, cameraRadius];
+        const cameraRadius = 1/cameraData.zoom * 100;
+        const angleInRadians = getAngleInRadians(cameraData.angle);
+        const height = cameraData.height * planet.data.radius * 0.5;
+        const x = Math.sin(angleInRadians) * cameraRadius;
+        const z = Math.cos(angleInRadians) * cameraRadius;
+        const cameraPosition = [x, height, z];
         const target = [0, 0, 0];
         const up = [0, 1, 0];
         return m4.lookAt(cameraPosition, target, up);
@@ -379,7 +409,7 @@ function main() {
     function setProjectionMatrix() {
         const fov = cameraData.fov * Math.PI / 180;
         const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-        return m4.perspective(fov, aspect, 0.1, 100);
+        return m4.perspective(fov, aspect, 0.1, 150);
     }
 
     function getAngleInRadians(degrees) {
@@ -402,8 +432,10 @@ function main() {
     ]);
 
     webglLessonsUI.setupUI(document.querySelector("#ui-camera"), cameraData, [
-        { type: "slider", key: "radius", change: drawScene, min: 2, max: 20, precision: 1, step: 0.1, name: "Camera Radius" },
-        { type: "slider", key: "fov", change: drawScene, min: 10, max: 120, precision: 0, name: "Field of View" },
+        { type: "slider", key: "zoom", min: 1, max: 30, precision: 1, step: 0.1, name: "Camera Zoom" },
+        { type: "slider", key: "fov", min: 10, max: 120, precision: 0, name: "Camera Field of View" },
+        { type: "slider", key: "angle", min: -180, max: 180, precision: 0, name: "Camera Angle" },
+        { type: "slider", key: "height", min: -10, max: 10, precision: 1, step: 0.1, name: "Camera Height" },
     ]);
 
     webglLessonsUI.setupUI(document.querySelector("#ui-stones"), stone.data, [
@@ -422,7 +454,7 @@ function main() {
     webglLessonsUI.setupUI(document.querySelector("#ui-star"), star.data, [
         { type: "slider", key: "distanceFromPlanetFactor", change: updateStar, min: 0.1, max: 3.0, precision: 2, step: 0.1, name: "Distance from Planet Factor" },
         { type: "slider", key: "orbitSpeed", min: 0, max: 100, precision: 0, name: "Orbit Speed" },
-        { type: "slider", key: "generalShininessFactor", min: 0.01, max: 3, precision: 2, step: 0.01, name: "Shininess Scale" },
+        { type: "slider", key: "generalShininessFactor", change: updateLight, min: 0.01, max: 3, precision: 2, step: 0.01, name: "Shininess Scale" },
     ]);
 
     function updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix) {
@@ -444,14 +476,6 @@ function main() {
         
         return drawables;
     }
-
-    // function updateFoliageAnimation(time) {
-    //     const windSpeed = tree.data.windSpeed;
-    //     const angle = Math.sin(time * 0.001) * tree.data.foliageSwingAngle * 0.003 * windSpeed;
-    //     objects.foliageGroups.forEach((foliageGroup) => {
-    //         foliageGroup.localMatrix = m4.multiply(foliageGroup.localMatrix, m4.yRotation(angle));
-    //     });
-    // }
 
     function updateFoliageAnimation(deltaTime) {
         const speed = tree.data.windSpeed;
