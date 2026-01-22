@@ -23,7 +23,8 @@ class Planet {
             sandColor: [0.76, 0.7, 0.5, 1.0],
             grassColor: [0.0, 1.0, 0.0, 1.0],
             rockColor: [0.5, 0.5, 0.5, 1.0],
-            snowColor: [1.0, 1.0, 1.0, 1.0]
+            snowColor: [1.0, 1.0, 1.0, 1.0],
+            shininess: 300.0,
         };
 
         this.uniforms = {};
@@ -42,10 +43,13 @@ class Planet {
         uniform mat4 u_inverseTransposedWorldMatrix;
 
         uniform vec3 u_lightWorldPosition;
+        uniform vec3 u_viewWorldPosition;
 
         out vec3 v_normal;
         out float v_height;
+
         out vec3 v_surfaceToLight;
+        out vec3 v_surfaceToView;
 
         void main() {
             // Multiply the position by the matrix.
@@ -62,6 +66,10 @@ class Planet {
             // compute the vector of the surface to the light
             // and pass it to the fragment shader
             v_surfaceToLight = u_lightWorldPosition - surfaceWorldPosition;
+
+            // compute the vector of the surface to the view/camera
+            // and pass it to the fragment shader
+            v_surfaceToView = u_viewWorldPosition - surfaceWorldPosition;
         }
         `;
     }
@@ -71,10 +79,14 @@ class Planet {
         precision highp float;
 
         in vec3 v_normal;
-        in vec3 v_surfaceToLight;
         in float v_height;
 
+        in vec3 v_surfaceToLight;
+        in vec3 v_surfaceToView;
+
         uniform float u_ambientLight;
+        uniform vec4 u_specularColor;
+        uniform float u_shininess;
         
         uniform float u_waterAltitude;
         uniform float u_sandAltitude;
@@ -96,17 +108,32 @@ class Planet {
             vec3 normal = normalize(v_normal);
 
             vec3 surfaceToLightDirection = normalize(v_surfaceToLight);
+            vec3 surfaceToViewDirection = normalize(v_surfaceToView);
+            vec3 halfVector = normalize(surfaceToLightDirection + surfaceToViewDirection);
 
             float diffuseLight = max(dot(normal, surfaceToLightDirection), 0.0);
-            float light = diffuseLight + u_ambientLight;
+            float specular = 0.0;
+            if (diffuseLight > 0.0) {
+                specular = pow(max(dot(normal, halfVector), 0.0), u_shininess);
+            }
 
-            out_color = step(v_height, u_waterAltitude) * u_colorWater +
-                        step(u_waterAltitude, v_height) * step(v_height, u_sandAltitude) * u_colorSand +
-                        step(u_sandAltitude, v_height) * step(v_height, u_grassAltitude) * u_colorGrass +
-                        step(u_grassAltitude, v_height) * step(v_height, u_rockAltitude) * u_colorRock +
-                        step(u_rockAltitude, v_height) * u_colorSnow;
+            // Lets multiply just the color portion (not the alpha)
+            // by the light
+             
+            vec3 base_color = step(v_height, u_waterAltitude) * u_colorWater.rgb +
+                        step(u_waterAltitude, v_height) * step(v_height, u_sandAltitude) * u_colorSand.rgb +
+                        step(u_sandAltitude, v_height) * step(v_height, u_grassAltitude) * u_colorGrass.rgb +
+                         step(u_grassAltitude, v_height) * step(v_height, u_rockAltitude) * u_colorRock.rgb +
+                        step(u_rockAltitude, v_height) * u_colorSnow.rgb;
 
-            out_color.rgb *= light;
+            vec3 ambient = base_color * u_ambientLight;
+            vec3 diffuse = base_color * diffuseLight;
+            vec3 specularLight = u_specularColor.rgb * specular;
+            vec3 finalColor = ambient + diffuse + specularLight;
+
+            finalColor = clamp(finalColor, 0.0, 1.0);
+
+            out_color = vec4(finalColor, 1.0);
         }
         `;
         
@@ -157,6 +184,7 @@ class Planet {
             u_sandAltitude: terrainColorAltitude.sand,
             u_grassAltitude: terrainColorAltitude.grass,
             u_rockAltitude: terrainColorAltitude.rock,
+            u_shininess: this.data.shininess,
             u_colorWater: this.data.waterColor,
             u_colorSand: this.data.sandColor,
             u_colorGrass: this.data.grassColor,
@@ -272,6 +300,7 @@ class PlanetObject {
             minScaleFactor: 0.5,
             maxScaleFactor: 2.0,
             minDistanceBetweenObjects: 1.4,
+            shininess: 200.0,
         };
     }
 
@@ -357,6 +386,7 @@ class Stone extends PlanetObject {
             stoneNormalColor: [0.5, 0.5, 0.6, 1.0], 
             stoneIceColor: [0.65, 0.95, 0.95, 1.0],
             minDistanceBetweenObjects: 0.2,
+            shininess: 100.0,
         };
 
     }
@@ -391,10 +421,10 @@ class Tree extends PlanetObject {
             ],
             foliageIceColor: [0.9, 1.0, 1.0, 1.0],
             foliageMaxSwingAngle: 15.0,
-            foliageSwingAngleAcc: 0.0,
+            foliageSwingAngle: 0.0,
             foliageSwingDirection: 1,
             originalFoliageLocalMatrix: null,
-            windSpeed: 30
+            windSpeed: 20
         };
     }
 
@@ -420,7 +450,9 @@ class Star {
             distanceFromPlanetFactor: 1.5,
             lightIntensity: 1.0,
             color: [1.0, 1.0, 0.8, 1.0],
-            ambientLight: 0.3
+            specularColor: [1.0, 1.0, 1.0, 1.0],
+            ambientLight: 0.3,
+            generalShininessFactor: 1.0
         };
     }
 

@@ -143,14 +143,16 @@ function main() {
             stoneNode.setParent(planetNode);
             const stoneAltitude = twgl.v3.length(position);
             const rockAltitude = planet.getAltitude(planet.data.rockAltitude);
-            const stoneColor = stoneAltitude > rockAltitude ? stone.data.stoneIceColor : stone.data.stoneNormalColor;
+            const stoneOnIce = stoneAltitude > rockAltitude;
+            const stoneColor = stoneOnIce ? stone.data.stoneIceColor : stone.data.stoneNormalColor;
             stoneNode.drawInfo = {
                 vertexArray: stoneVAO,       
                 programInfo: stoneProgramInfo,
                 bufferInfo: stoneBufferInfo,
                 uniforms: {
-                    u_color: stoneColor
-                },
+                    u_color: stoneColor,
+                    u_shininess: stoneOnIce ? stone.data.shininess : stone.data.shininess / 2
+                }
             };
 
             const normal = twgl.v3.normalize(position);
@@ -176,7 +178,8 @@ function main() {
                 programInfo: treeProgramInfo,
                 bufferInfo: foliageBufferInfo,
                 uniforms: {
-                    u_color: foliageColor
+                    u_color: foliageColor,
+                    u_shininess: tree.data.shininess
                 }
             };
 
@@ -223,7 +226,8 @@ function main() {
             programInfo: treeProgramInfo,
             bufferInfo: trunkBufferInfo,
             uniforms: {
-                u_color: tree.data.trunkColor
+                u_color: tree.data.trunkColor,
+                u_shininess: tree.data.shininess
             },
         };
 
@@ -236,7 +240,8 @@ function main() {
         createFoliageGroup(foliageGroupNode, foliageColor);
 
         foliageGroupNode.localMatrix = m4.translation(0, tree.data.trunkHeight * 1.5, 0);
-        tree.data.originalFoliageLocalMatrix = foliageGroupNode.localMatrix;
+
+        tree.data.originalFoliageLocalMatrix = m4.multiply(foliageGroupNode.localMatrix, m4.identity());
 
         objects.foliageGroups.push(foliageGroupNode);
     }
@@ -353,6 +358,11 @@ function main() {
         updateObjectsPlacement();
         updateStar();
     }
+
+    function updateLightAndColor() {
+        updateStar();
+        planet.update();
+    }
     
     updatePlanet();
 
@@ -408,10 +418,11 @@ function main() {
         { type: "slider", key: "minDistanceBetweenObjects", change: updateTreesPlacement, min: 0.01, max: 2.0, precision: 2, step: 0.01, name: "Min Distance Between Trees" },
         { type: "slider", key: "windSpeed", min: 1, max: 100, precision: 0, step: 1, name: "Wind Speed" },
     ]);
-
+    
     webglLessonsUI.setupUI(document.querySelector("#ui-star"), star.data, [
         { type: "slider", key: "distanceFromPlanetFactor", change: updateStar, min: 0.1, max: 3.0, precision: 2, step: 0.1, name: "Distance from Planet Factor" },
         { type: "slider", key: "orbitSpeed", min: 0, max: 100, precision: 0, name: "Orbit Speed" },
+        { type: "slider", key: "generalShininessFactor", min: 0.01, max: 3, precision: 2, step: 0.01, name: "Shininess Scale" },
     ]);
 
     function updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix) {
@@ -426,6 +437,7 @@ function main() {
                 const lightWorldPosition = starNode.worldMatrix.slice(12, 15);
                 object.drawInfo.uniforms.u_lightWorldPosition = lightWorldPosition;
                 object.drawInfo.uniforms.u_ambientLight = star.data.ambientLight;
+                object.drawInfo.uniforms.u_specularColor = star.data.specularColor;
                 drawables.push(object.drawInfo);
             });
         });
@@ -442,21 +454,24 @@ function main() {
     // }
 
     function updateFoliageAnimation(deltaTime) {
-        let angle = (deltaTime * tree.data.windSpeed)
-        const foliageSwingAngleAcc = tree.data.foliageSwingAngleAcc + angle;
-        if (foliageSwingAngleAcc < tree.data.foliageMaxSwingAngle) tree.data.foliageSwingAngleAcc = foliageSwingAngleAcc;
-        else {
-            angle = tree.data.foliageMaxSwingAngle - tree.data.foliageSwingAngleAcc;
-            tree.data.foliageSwingAngleAcc = 0.0;
+        const speed = tree.data.windSpeed;
+        const maxAngle = tree.data.foliageMaxSwingAngle;
+        tree.data.foliageSwingAngle += deltaTime * speed * tree.data.foliageSwingDirection;
+        if (tree.data.foliageSwingAngle > maxAngle) {
+            tree.data.foliageSwingAngle = maxAngle;
+            tree.data.foliageSwingDirection *= -1;
+        } 
+
+        if (tree.data.foliageSwingAngle < -maxAngle) {
+            tree.data.foliageSwingAngle = -maxAngle;
             tree.data.foliageSwingDirection *= -1;
         }
-        const angleInRadians = getAngleInRadians(angle); 
+
         objects.foliageGroups.forEach((foliageGroup, index) => {
-            if (index % 2 === 0) {
-                foliageGroup.localMatrix = m4.zRotate(foliageGroup.localMatrix, angleInRadians * tree.data.foliageSwingDirection)
-            } else {
-                foliageGroup.localMatrix = m4.zRotate(foliageGroup.localMatrix, angleInRadians * tree.data.foliageSwingDirection * (-1))
-            }
+            const direction = (index % 2 === 0) ? 1 : -1;
+            const swingAngle = tree.data.foliageSwingAngle * direction;
+            foliageGroup.localMatrix = m4.multiply(tree.data.originalFoliageLocalMatrix, m4.identity());
+            foliageGroup.localMatrix = m4.zRotate(foliageGroup.localMatrix, getAngleInRadians(swingAngle));
         });
     }
 
