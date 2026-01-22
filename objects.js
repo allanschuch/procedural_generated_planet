@@ -24,6 +24,7 @@ class Planet {
             grassColor: [0.0, 1.0, 0.0, 1.0],
             rockColor: [0.5, 0.5, 0.5, 1.0],
             snowColor: [1.0, 1.0, 1.0, 1.0],
+            tempSnowColor: [1.0, 1.0, 1.0, 1.0],
             shininess: 300.0,
         };
 
@@ -385,6 +386,7 @@ class Stone extends PlanetObject {
             stoneCubeSize: 0,
             stoneNormalColor: [0.5, 0.5, 0.6, 1.0], 
             stoneIceColor: [0.65, 0.95, 0.95, 1.0],
+            tempStoneIceColor: [0.65, 0.95, 0.95, 1.0],
             minDistanceBetweenObjects: 0.2,
             shininess: 100.0,
         };

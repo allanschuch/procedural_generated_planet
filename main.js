@@ -376,9 +376,10 @@ function main() {
     function updateStoneColor() {
         stoneNodes.forEach(stoneNode => {
             stoneNode.drawInfo.uniforms.u_color = stoneNode.drawInfo.uniforms.u_color === stone.data.stoneIceColor ?
-            stone.data.stoneIceColor :
+            stone.data.tempStoneIceColor :
             stone.data.stoneNormalColor;
         });
+        stone.data.stoneIceColor = stone.data.tempStoneIceColor;
     }
 
     function updateStarColor() {
@@ -391,35 +392,19 @@ function main() {
     }
 
     function updatePlanetSnowColor() {
-        planet.update();
-        planetNode.drawInfo.uniforms = planet.uniforms;
         objects.foliageGroups.forEach(foliageGroupNode => {
             foliageGroupNode.children.forEach(foliageNode => {
-                foliageNode.drawInfo.uniforms.u_color = foliageNode.drawInfo.uniforms.u_color === planet.data.snowColor ?
-                planet.data.snowColor :
-                tree.data.foliageNormalColor[randomIndex];
+                if (foliageNode.drawInfo.uniforms.u_color === planet.data.snowColor) {
+                    foliageNode.drawInfo.uniforms.u_color = planet.data.tempSnowColor;
+                }
             });
         });
+        planet.data.snowColor = planet.data.tempSnowColor;
+        planet.update();
+        planetNode.drawInfo.uniforms = planet.uniforms;
     }
 
     function updateTreeColor() {
-        let randomIndex = 0;
-        objects.foliageGroups.forEach(foliageGroupNode => {
-            randomIndex = Math.floor(Math.random() * 3);
-            foliageGroupNode.children.forEach(foliageNode => {
-                foliageNode.drawInfo.uniforms.u_color = foliageNode.drawInfo.uniforms.u_color === planet.data.snowColor ?
-                planet.data.snowColor :
-                tree.data.foliageNormalColor[randomIndex];
-            });
-        });
-    }
-
-    function updateColors() {
-        planet.update();
-        planetNode.drawInfo.uniforms = planet.uniforms;
-
-        starNode.drawInfo.uniforms.u_color = star.data.color;
-       
         let randomIndex = 0;
         objects.foliageGroups.forEach(foliageGroupNode => {
             randomIndex = Math.floor(Math.random() * 3);
@@ -541,6 +526,7 @@ function main() {
         updateStar,
         updateLight,
         updatePlanetColor,
+        updatePlanetSnowColor,
         updateTreeColor,
         updateStoneColor,
         updateStarColor

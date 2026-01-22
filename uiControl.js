@@ -12,6 +12,7 @@ function setupAllUI(planet, cameraData, stone, tree, star, callbacks) {
         updateStar,
         updateLight,
         updatePlanetColor,
+        updatePlanetSnowColor,
         updateTreeColor,
         updateStoneColor,
         updateStarColor   
@@ -37,7 +38,7 @@ function setupAllUI(planet, cameraData, stone, tree, star, callbacks) {
         { type: "color", key: "sandColor", change: updatePlanetColor, name: "Sand Color" },
         { type: "color", key: "grassColor", change: updatePlanetColor, name: "Grass Color" },
         { type: "color", key: "rockColor", change: updatePlanetColor, name: "Rock Color" },
-        { type: "color", key: "snowColor", change: updatePlanetColor, name: "Snow Color" },
+        { type: "color", key: "tempSnowColor", change: updatePlanetSnowColor, name: "Snow Color" },
     ]);
 
     webglLessonsUI.setupUI(document.querySelector("#ui-camera"), cameraData, [
@@ -53,7 +54,7 @@ function setupAllUI(planet, cameraData, stone, tree, star, callbacks) {
         { type: "slider", key: "numberOf", change: updateStonesPlacement, min: 0, max: 500, precision: 0, name: "Count" },
         { type: "slider", key: "minDistanceBetweenObjects", change: updateStonesPlacement, min: 0.01, max: 1.0, precision: 2, step: 0.01, name: "Spacing" },
         { type: "color", key: "stoneNormalColor", change: updateStoneColor, name: "Color" },
-        { type: "color", key: "stoneIceColor", change: updateStoneColor, name: "Ice Color" },
+        { type: "color", key: "tempStoneIceColor", change: updateStoneColor, name: "Ice Color" },
     ]);
 
     // --- TREES UI ---
