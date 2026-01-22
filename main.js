@@ -214,8 +214,13 @@ function main() {
         if (treeAltitude > rockAltitude) {
             foliageColor = planet.data.snowColor;
         } else {
+            const foliageColors = {
+                0: tree.data.foliageNormalColor1,
+                1: tree.data.foliageNormalColor2,
+                2: tree.data.foliageNormalColor3
+            }
             const randomIndex = Math.floor(Math.random() * 3)
-            foliageColor = tree.data.foliageNormalColor[randomIndex];
+            foliageColor = foliageColors[randomIndex];
         }
 
         const trunkNode = new Node();
@@ -363,18 +368,20 @@ function main() {
         const shininessFactor = star.data.generalShininessFactor;
         objects.stones.forEach(stoneNode => 
             stoneNode.drawInfo.uniforms.u_shininess = stoneNode.drawInfo.uniforms.u_color === stone.data.stoneNormalColor ? 
-            stone.data.shininess * shininessFactor : stone.data.shininess / 2 * shininessFactor);
+            stone.data.shininess / shininessFactor : stone.data.shininess / 2 / shininessFactor);
         
         objects.trunks.forEach(trunkNode =>
-            trunkNode.drawInfo.uniforms.u_shininess = tree.data.shininess * shininessFactor);
+            trunkNode.drawInfo.uniforms.u_shininess = tree.data.shininess / shininessFactor);
        
         foliageNodes.forEach(foliageNode => {
-            foliageNode.drawInfo.uniforms.u_shininess = tree.data.shininess * shininessFactor
+            foliageNode.drawInfo.uniforms.u_shininess = tree.data.shininess / shininessFactor
         });
+
+        planetNode.drawInfo.uniforms.u_shininess = planet.data.shininess / shininessFactor;
     }
 
     function updateStoneColor() {
-        stoneNodes.forEach(stoneNode => {
+        objects.stones.forEach(stoneNode => {
             stoneNode.drawInfo.uniforms.u_color = stoneNode.drawInfo.uniforms.u_color === stone.data.stoneIceColor ?
             stone.data.tempStoneIceColor :
             stone.data.stoneNormalColor;
@@ -406,12 +413,17 @@ function main() {
 
     function updateTreeColor() {
         let randomIndex = 0;
+        const foliageColors = {
+            0: tree.data.foliageNormalColor1,
+            1: tree.data.foliageNormalColor2,
+            2: tree.data.foliageNormalColor3
+        }
         objects.foliageGroups.forEach(foliageGroupNode => {
-            randomIndex = Math.floor(Math.random() * 3);
+            randomIndex = Math.floor(Math.random() * 3)
             foliageGroupNode.children.forEach(foliageNode => {
-                foliageNode.drawInfo.uniforms.u_color = foliageNode.drawInfo.uniforms.u_color === planet.data.snowColor ?
-                planet.data.snowColor :
-                tree.data.foliageNormalColor[randomIndex];
+                if (foliageNode.drawInfo.uniforms.u_color !== planet.data.snowColor) {
+                    foliageNode.drawInfo.uniforms.u_color = foliageColors[randomIndex];
+                }
             });
         });
     }
@@ -455,6 +467,7 @@ function main() {
                 object.drawInfo.uniforms.u_lightWorldPosition = lightWorldPosition;
                 object.drawInfo.uniforms.u_ambientLight = star.data.ambientLight;
                 object.drawInfo.uniforms.u_specularColor = star.data.specularColor;
+                object.drawInfo.uniforms.u_diffuseColor = star.data.color;
                 drawables.push(object.drawInfo);
             });
         });

@@ -1,8 +1,8 @@
 /* 1. Configuração Global da Página */
 body {
     margin: 0;
-    overflow: hidden; /* Remove barras de rolagem da página */
-    background-color: #000; /* Fundo PRETO essencial */
+    overflow: hidden;
+    background-color: #000;
     color: white;
     font-family: monospace;
 }
@@ -13,45 +13,34 @@ canvas {
     height: 100vh;
 }
 
-/* 2. Container Principal da UI */
 #uiContainer {
     position: absolute;
     top: 10px;
     right: 10px;
     z-index: 2;
-    
     display: flex;
     align-items: flex-start;
-    gap: 10px; /* Um pouco mais de espaço entre colunas */
-    
-    /* AUMENTADO: de 400px para 550px */
+    gap: 10px;
     width: 550px; 
     max-height: 100vh;
-    
     transform: scale(0.85);
     transform-origin: top right;
-    
     pointer-events: none;
 }
 
-/* 3. Colunas Verticais */
 .ui-col {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    flex: 1; /* Largura igual para as colunas */
-    
-    overflow-y: auto; /* Permite rolagem se necessário */
-    pointer-events: auto; /* Reativa cliques nos botões/sliders */
-    
-    /* Esconde barra de rolagem */
+    flex: 1; 
+    overflow-y: auto;
+    pointer-events: auto; 
     scrollbar-width: none; 
 }
 .ui-col::-webkit-scrollbar { 
     display: none; 
 }
 
-/* 4. Caixas dos Grupos (Planet, Camera, etc) */
 .ui-group {
     background: rgba(0, 0, 0, 0.85);
     padding: 8px;
@@ -69,28 +58,20 @@ canvas {
     border-bottom: 1px solid #444;
 }
 
-/* 5. Ajustes dos Widgets da Biblioteca */
 .gman-widget-outer {
     display: flex;
     align-items: center;
     justify-content: space-between;
     height: 20px;
-    font-size: 10px; /* Fonte interna menor */
+    font-size: 10px;
 }
 
 .gman-widget-label {
-    /* AUMENTADO: de 90px para 180px (ou mais, se precisar) */
-    width: 80px; 
-    
-    /* IMPORTANTE: Garante que o texto nunca encolha */
-    min-width: 80px; 
-    
+    width: 90px; 
+    min-width: 90px; 
     overflow: hidden;
     white-space: nowrap;
-    /* Removemos o 'text-overflow: ellipsis' se quiser que corte seco, 
-       mas com 180px deve caber quase tudo sem cortar */
-    
-    margin-right: 10px; /* Afasta o texto do slider */
+    margin-right: 10px;
 }
 
 .gman-widget-value {
@@ -106,7 +87,6 @@ canvas {
     cursor: pointer;
 }
 
-/* Inputs de Cor e Select */
 input[type="color"] {
     border: none;
     width: 30px;

@@ -57,23 +57,20 @@ function setupAllUI(planet, cameraData, stone, tree, star, callbacks) {
         { type: "color", key: "tempStoneIceColor", change: updateStoneColor, name: "Ice Color" },
     ]);
 
-    // --- TREES UI ---
     webglLessonsUI.setupUI(document.querySelector("#ui-trees"), tree.data, [
         { type: "slider", key: "tempScale", change: updateTreeScale, min: 0.1, max: 3.0, precision: 2, step: 0.01, name: "Scale" },
         { type: "slider", key: "numberOf", change: updateTreesPlacement, min: 0, max: 300, precision: 0, name: "Count" },
         { type: "slider", key: "minDistanceBetweenObjects", change: updateTreesPlacement, min: 0.01, max: 2.0, precision: 2, step: 0.01, name: "Spacing" },
-        { type: "slider", key: "windSpeed", min: 1, max: 100, precision: 0, step: 1, name: "Wind" },
-        { type: "color", key: "foliageNormalColor", change: updateTreeColor, name: "Leaves" }, 
-        // Nota: FoliageNormalColor no seu codigo parece ser um array de cores? 
-        // Se for, o color picker vai pegar so a primeira ou dar erro. 
-        // Se quiser editar variações, precisa de lógica extra.
+        { type: "slider", key: "windSpeed", min: 0, max: 200, precision: 0, step: 1, name: "Wind Speed" },
+        { type: "color", key: "foliageNormalColor1", change: updateTreeColor, name: "Foliage Color 1" },
+        { type: "color", key: "foliageNormalColor2", change: updateTreeColor, name: "Foliage Color 2" },
+        { type: "color", key: "foliageNormalColor3", change: updateTreeColor, name: "Foliage Color 3" },
     ]);
 
-    // --- STAR UI ---
     webglLessonsUI.setupUI(document.querySelector("#ui-star"), star.data, [
-        { type: "slider", key: "distanceFromPlanetFactor", change: updateStar, min: 0.1, max: 3.0, precision: 2, step: 0.1, name: "Dist" },
-        { type: "slider", key: "orbitSpeed", min: 0, max: 100, precision: 0, name: "Speed" },
-        { type: "slider", key: "generalShininessFactor", change: updateLight, min: 0.01, max: 3, precision: 2, step: 0.01, name: "Shine" },
+        { type: "slider", key: "distanceFromPlanetFactor", change: updateStar, min: 0.1, max: 3.0, precision: 2, step: 0.1, name: "Distance" },
+        { type: "slider", key: "orbitSpeed", min: 0, max: 100, precision: 0, name: "Orbit Speed" },
+        { type: "slider", key: "generalShininessFactor", change: updateLight, min: 0.01, max: 3, precision: 2, step: 0.01, name: "Shininess Scale" },
         { type: "color", key: "color", change: updateStarColor, name: "Color" },
     ]);
 }

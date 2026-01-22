@@ -25,7 +25,7 @@ class Planet {
             rockColor: [0.5, 0.5, 0.5, 1.0],
             snowColor: [1.0, 1.0, 1.0, 1.0],
             tempSnowColor: [1.0, 1.0, 1.0, 1.0],
-            shininess: 300.0,
+            shininess: 1.0,
         };
 
         this.uniforms = {};
@@ -87,6 +87,7 @@ class Planet {
 
         uniform float u_ambientLight;
         uniform vec4 u_specularColor;
+        uniform vec4 u_diffuseColor;
         uniform float u_shininess;
         
         uniform float u_waterAltitude;
@@ -113,9 +114,9 @@ class Planet {
             vec3 halfVector = normalize(surfaceToLightDirection + surfaceToViewDirection);
 
             float diffuseLight = max(dot(normal, surfaceToLightDirection), 0.0);
-            float specular = 0.0;
+            float specularLight = 0.0;
             if (diffuseLight > 0.0) {
-                specular = pow(max(dot(normal, halfVector), 0.0), u_shininess);
+                specularLight = pow(max(dot(normal, halfVector), 0.0), u_shininess);
             }
 
             // Lets multiply just the color portion (not the alpha)
@@ -127,10 +128,11 @@ class Planet {
                          step(u_grassAltitude, v_height) * step(v_height, u_rockAltitude) * u_colorRock.rgb +
                         step(u_rockAltitude, v_height) * u_colorSnow.rgb;
 
+            vec3 diffuseColor = u_diffuseColor.rgb;
             vec3 ambient = base_color * u_ambientLight;
-            vec3 diffuse = base_color * diffuseLight;
-            vec3 specularLight = u_specularColor.rgb * specular;
-            vec3 finalColor = ambient + diffuse + specularLight;
+            vec3 diffuse = base_color * diffuseLight * diffuseColor;
+            vec3 specular = u_specularColor.rgb * specularLight;
+            vec3 finalColor = ambient + diffuse + specular;
 
             finalColor = clamp(finalColor, 0.0, 1.0);
 
@@ -301,7 +303,7 @@ class PlanetObject {
             minScaleFactor: 0.5,
             maxScaleFactor: 2.0,
             minDistanceBetweenObjects: 1.4,
-            shininess: 200.0,
+            shininess: 80.0,
         };
     }
 
@@ -315,10 +317,13 @@ class PlanetObject {
         uniform mat4 u_inverseTransposedWorldMatrix;
 
         uniform vec3 u_lightWorldPosition;
+        uniform vec3 u_viewWorldPosition;
 
         out vec3 v_normal;
         out float v_height;
+
         out vec3 v_surfaceToLight;
+        out vec3 v_surfaceToView;
 
         void main() {
             // Multiply the position by the matrix.
@@ -335,6 +340,10 @@ class PlanetObject {
             // compute the vector of the surface to the light
             // and pass it to the fragment shader
             v_surfaceToLight = u_lightWorldPosition - surfaceWorldPosition;
+
+            // compute the vector of the surface to the view/camera
+            // and pass it to the fragment shader
+            v_surfaceToView = u_viewWorldPosition - surfaceWorldPosition;
         }
         `;
     }
@@ -344,10 +353,20 @@ class PlanetObject {
         precision highp float;
 
         in vec3 v_normal;
-        in vec3 v_surfaceToLight;
         in float v_height;
 
+        in vec3 v_surfaceToLight;
+        in vec3 v_surfaceToView;
+
         uniform float u_ambientLight;
+        uniform vec4 u_specularColor;
+        uniform vec4 u_diffuseColor;
+        uniform float u_shininess;
+        
+        uniform float u_waterAltitude;
+        uniform float u_sandAltitude;
+        uniform float u_grassAltitude;
+        uniform float u_rockAltitude;
         
         uniform vec4 u_color;
         
@@ -360,13 +379,28 @@ class PlanetObject {
             vec3 normal = normalize(v_normal);
 
             vec3 surfaceToLightDirection = normalize(v_surfaceToLight);
+            vec3 surfaceToViewDirection = normalize(v_surfaceToView);
+            vec3 halfVector = normalize(surfaceToLightDirection + surfaceToViewDirection);
 
             float diffuseLight = max(dot(normal, surfaceToLightDirection), 0.0);
-            float light = diffuseLight + u_ambientLight;
+            float specularLight = 0.0;
+            if (diffuseLight > 0.0) {
+                specularLight = pow(max(dot(normal, halfVector), 0.0), u_shininess);
+            }
 
-            out_color = u_color;
+            // Lets multiply just the color portion (not the alpha)
+            // by the light
 
-            out_color.rgb *= light;
+            vec3 baseColor = u_color.rgb;
+            vec3 diffuseColor = u_diffuseColor.rgb;
+            vec3 ambient = baseColor * u_ambientLight;
+            vec3 diffuse = baseColor * diffuseLight * diffuseColor;
+            vec3 specular = u_specularColor.rgb * specularLight;
+            vec3 finalColor = ambient + diffuse + specular;
+
+            finalColor = clamp(finalColor, 0.0, 1.0);
+
+            out_color = vec4(finalColor, 1.0);
         }
         `;
         
@@ -388,7 +422,7 @@ class Stone extends PlanetObject {
             stoneIceColor: [0.65, 0.95, 0.95, 1.0],
             tempStoneIceColor: [0.65, 0.95, 0.95, 1.0],
             minDistanceBetweenObjects: 0.2,
-            shininess: 100.0,
+            shininess: 40.0,
         };
 
     }
@@ -416,11 +450,9 @@ class Tree extends PlanetObject {
             trunkHeight: 0.2,
             trunkRadius: 0.035,
             trunkColor: [0.55, 0.27, 0.07, 1.0],
-            foliageNormalColor: [
-            [0.2, 0.8, 0.2, 1.0], 
-            [0.5, 0.9, 0.0, 1.0],
-            [0.0, 0.5, 0.1, 1.0]
-            ],
+            foliageNormalColor1: [0.2, 0.8, 0.2, 1.0],
+            foliageNormalColor2: [0.5, 0.9, 0.0, 1.0],
+            foliageNormalColor3: [0.0, 0.5, 0.1, 1.0],
             foliageIceColor: [0.9, 1.0, 1.0, 1.0],
             foliageMaxSwingAngle: 15.0,
             foliageSwingAngle: 0.0,
@@ -440,7 +472,7 @@ class Tree extends PlanetObject {
 
     getFoliageArrays(planetRadius) {
         const foliageRadius = this.data.foliageRadiusFactor * planetRadius;
-        return twgl.primitives.createSphereVertices(foliageRadius, 6, 6);
+        return twgl.primitives.createSphereVertices(foliageRadius, 12, 12);
     }
 }
 
@@ -450,7 +482,6 @@ class Star {
             starRadiusFactor: 0.3,
             orbitSpeed: 5,
             distanceFromPlanetFactor: 1.5,
-            lightIntensity: 1.0,
             color: [1.0, 1.0, 0.8, 1.0],
             specularColor: [1.0, 1.0, 1.0, 1.0],
             ambientLight: 0.3,
