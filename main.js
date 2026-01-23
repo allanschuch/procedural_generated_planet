@@ -466,7 +466,7 @@ function main() {
                 const lightWorldPosition = starNode.worldMatrix.slice(12, 15);
                 object.drawInfo.uniforms.u_lightWorldPosition = lightWorldPosition;
                 object.drawInfo.uniforms.u_ambientLight = star.data.ambientLight;
-                object.drawInfo.uniforms.u_specularColor = star.data.specularColor;
+                object.drawInfo.uniforms.u_specularColor = star.data.color;
                 object.drawInfo.uniforms.u_diffuseColor = star.data.color;
                 drawables.push(object.drawInfo);
             });
