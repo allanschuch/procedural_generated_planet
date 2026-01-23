@@ -15,11 +15,32 @@ function main() {
         },
         };
 
+    const shadowMapVS =
+        `#version 300 es
+        in vec4 a_position;
+        uniform mat4 u_worldMatrix;
+        uniform mat4 u_lightViewProjectionMatrix;
+        void main() {
+            gl_Position = u_lightViewProjectionMatrix * u_worldMatrix * a_position;
+        }
+        `;
+
+    const shadowMapFS =
+        `#version 300 es
+        precision highp float;
+        void main() {
+            // gl_FragDepth is set automatically
+        }
+        `;
+    
+    const shadowMapConfig = createShadowMapFramebuffer();
+
     // PLANET AND STAR CONFIG
 
     const planet = new Planet();
 
-    const planetProgramInfo = twgl.createProgramInfo(gl, [planet.getVS(), planet.getFS()]);
+    const planetProgramInfo = twgl.createProgramInfo(gl, [planet.getVS(), planet.getFS()], programOptions);
+    const planetShadowMapProgramInfo = twgl.createProgramInfo(gl, [shadowMapVS, shadowMapFS], programOptions);
     let planetBufferInfo = null;
     let planetVAO = null;
     const planetNode = new Node();
@@ -27,7 +48,9 @@ function main() {
 
     const star = new Star();
 
-    const starProgramInfo = twgl.createProgramInfo(gl, [star.getVS(), star.getFS()]);
+    const starProgramInfo = twgl.createProgramInfo(gl, [star.getVS(), star.getFS()], programOptions);
+    const starShadowMapProgramInfo = twgl.createProgramInfo(gl, [shadowMapVS, shadowMapFS], programOptions);
+
     let starBufferInfo = null;
     let starVAO = null;
     const starNode = new Node();
@@ -45,7 +68,9 @@ function main() {
 
     const stone = new Stone();
 
-    const stoneProgramInfo = twgl.createProgramInfo(gl, [stone.getVS(), stone.getFS()]);
+    const stoneProgramInfo = twgl.createProgramInfo(gl, [stone.getVS(), stone.getFS()], programOptions);
+    const stoneShadowMapProgramInfo = twgl.createProgramInfo(gl, [shadowMapVS, shadowMapFS], programOptions);
+
     const stoneArrays = stone.getStoneArrays(planet.data.radius);
     let stoneBufferInfo = twgl.createBufferInfoFromArrays(gl, stoneArrays);
     let stoneVAO = twgl.createVAOFromBufferInfo(gl, stoneProgramInfo, stoneBufferInfo);
@@ -54,7 +79,8 @@ function main() {
 
     const tree = new Tree();
 
-    const treeProgramInfo = twgl.createProgramInfo(gl, [tree.getVS(), tree.getFS()]);
+    const treeProgramInfo = twgl.createProgramInfo(gl, [tree.getVS(), tree.getFS()], programOptions);
+    const treeShadowMapProgramInfo = twgl.createProgramInfo(gl, [shadowMapVS, shadowMapFS], programOptions);
 
     const foliageArrays = tree.getFoliageArrays(planet.data.radius);
     let foliageBufferInfo = twgl.createBufferInfoFromArrays(gl, foliageArrays);
@@ -505,7 +531,7 @@ function main() {
         return m4.perspective(fov, aspect, 0.1, 150);
     }
 
-    function updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix) {
+    function updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix, programInfo) {
         const drawables = [];
         const lightWorldPosition = starNode.worldMatrix.slice(12, 15);
         const lightDirection = twgl.v3.normalize(twgl.v3.subtract([0,0,0], lightWorldPosition));
