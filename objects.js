@@ -34,6 +34,26 @@ class Planet {
         this.planetMaxAltitude = this.data.radius + this.data.noiseAmplitude;
     }
 
+    static get shadowVS() {
+        return `#version 300 es
+        in vec4 a_position;
+        uniform mat4 u_worldMatrix;
+        uniform mat4 u_lightViewProjectionMatrix;
+        void main() {
+            gl_Position = u_lightViewProjectionMatrix * u_worldMatrix * a_position;
+        }
+        `;
+    }
+
+    static get shadowFS() {
+        return `#version 300 es
+        precision highp float;
+        void main() {
+            // gl_FragDepth is set automatically
+        }
+        `;
+    }
+
     getVS() {
         return `#version 300 es
         in vec4 a_position;
@@ -411,7 +431,6 @@ class PlanetObject {
             out_color = vec4(finalColor, 1.0);
         }
         `;
-        
     }
 
     getRandomScaleFactor() {

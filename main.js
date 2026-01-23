@@ -6,6 +6,15 @@ function main() {
     if (!gl) return;
     twgl.setDefaults({attribPrefix: "a_"});
 
+    const programOptions = {
+        attribLocations: {
+            'a_position': 0,
+            'a_normal':   1,
+            'a_texcoord': 2,
+            'a_color':    3,
+        },
+        };
+
     // PLANET AND STAR CONFIG
 
     const planet = new Planet();
@@ -68,24 +77,38 @@ function main() {
         systems: [systemNode]
     }
 
-    function updateStoneScale(){
-        const newScaleFactor = stone.data.tempScale;
-        const previousScaleFactor = stone.data.scale;
-        stone.data.scale = newScaleFactor;     
-        const scaleRatio = newScaleFactor / previousScaleFactor;
-        objects.stones.forEach(stoneNode => {
-            stoneNode.localMatrix = m4.scale(stoneNode.localMatrix, scaleRatio, scaleRatio, scaleRatio);
-        });
-    }
-    
-    function updateTreeScale(){
-        const newScaleFactor = tree.data.tempScale;
-        const previousScaleFactor = tree.data.scale;
-        tree.data.scale = newScaleFactor;     
-        const scaleRatio = newScaleFactor / previousScaleFactor;
-        objects.trees.forEach(treeNode => {
-            treeNode.localMatrix = m4.scale(treeNode.localMatrix, scaleRatio, scaleRatio, scaleRatio);
-        });
+    // HELPER FUNCTIONS
+
+    function createShadowMapFramebuffer() {
+        const depthTexture = gl.createTexture();
+        const depthTextureSize = 512;
+        gl.bindTexture(gl.TEXTURE_2D, depthTexture);
+        gl.texImage2D(
+            gl.TEXTURE_2D,      // target
+            0,                  // mip level
+            gl.DEPTH_COMPONENT32F, // internal format
+            depthTextureSize,   // width
+            depthTextureSize,   // height
+            0,                  // border
+            gl.DEPTH_COMPONENT, // format
+            gl.FLOAT,           // type
+            null);              // data
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+ 
+        const depthFramebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, depthFramebuffer);
+        gl.framebufferTexture2D(
+            gl.FRAMEBUFFER,       // target
+            gl.DEPTH_ATTACHMENT,  // attachment point
+            gl.TEXTURE_2D,        // texture target
+            depthTexture,         // texture
+            0);                   // mip level
+        
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        return { framebuffer: depthFramebuffer, texture: depthTexture, size: depthTextureSize };
     }
 
     function getRandomPositionOnPlanetSurface() {
@@ -129,45 +152,29 @@ function main() {
         return positions;
     }
 
-    function updateStonesPlacement() {
-        objects.stones.forEach(stone => stone.setParent(null));
-        objects.stones = [];
-        
-        const planetNode = objects.planets[0];
-        
-        const stonePositions = generateRandomPositions(stone.data.numberOf, 1000, stone.data.minDistanceBetweenObjects, planet.data.waterAltitude, 1.0);
-        console.log(`Generated ${stonePositions.length} stones.`);
-        
-        objects.stones = stonePositions.map(position => {
-            const stoneNode = new Node();
-            stoneNode.setParent(planetNode);
-            const stoneAltitude = twgl.v3.length(position);
-            const rockAltitude = planet.getAltitude(planet.data.rockAltitude);
-            const stoneOnIce = stoneAltitude > rockAltitude;
-            const stoneColor = stoneOnIce ? stone.data.stoneIceColor : stone.data.stoneNormalColor;
-            stoneNode.drawInfo = {
-                vertexArray: stoneVAO,       
-                programInfo: stoneProgramInfo,
-                bufferInfo: stoneBufferInfo,
-                uniforms: {
-                    u_color: stoneColor,
-                    u_shininess: stoneOnIce ? stone.data.shininess : stone.data.shininess / 2
-                }
-            };
+    function getRotationMatrixFromUpToVector(targetVector, up = [0, 1, 0]) {
+        const normalizedUp = twgl.v3.normalize(up);
+        const normalizedTargetVector = twgl.v3.normalize(targetVector);
+        const axisToRotate = twgl.v3.cross(normalizedUp, normalizedTargetVector);
+        const axisLen = twgl.v3.length(axisToRotate);
 
-            const normal = twgl.v3.normalize(position);
-            const look = m4.lookAt([0,0,0], normal, [0,1,0]);
-            const rotationMatrix = m4.inverse(look);
-            const translationMatrix = m4.translation(position[0], position[1], position[2]);
-            let localMatrix = m4.multiply(translationMatrix, rotationMatrix);
-            const scaleFactor = stone.getRandomScaleFactor() * stone.data.scale;
-            localMatrix = m4.scale(localMatrix, scaleFactor, scaleFactor, scaleFactor);
+        if (axisLen < 1e-5) {
+            return m4.identity();
+        }
 
-            stoneNode.localMatrix = localMatrix;
+        twgl.v3.normalize(axisToRotate, axisToRotate);
 
-            return stoneNode;
-        });
+        const rotationInRadians = twgl.v3.dot(normalizedUp, normalizedTargetVector);
+        const rotationAngle = Math.acos(Math.min(1, Math.max(-1, rotationInRadians)));
+
+        return m4.axisRotate(m4.identity(), axisToRotate, rotationAngle);
     }
+
+    function getAngleInRadians(degrees) {
+        return degrees * Math.PI / 180;
+    }
+
+    // CREATE OBJECTS FUNCTIONS
 
     function createFoliageGroup(foliageGroupNode, foliageColor) {
         for (let i = 0; i < 5; i++) {
@@ -250,23 +257,68 @@ function main() {
         objects.foliageGroups.push(foliageGroupNode);
     }
 
-    function getRotationMatrixFromUpToVector(targetVector, up = [0, 1, 0]) {
-        const normalizedUp = twgl.v3.normalize(up);
-        const normalizedTargetVector = twgl.v3.normalize(targetVector);
-        const axisToRotate = twgl.v3.cross(normalizedUp, normalizedTargetVector);
-        const axisLen = twgl.v3.length(axisToRotate);
 
-        if (axisLen < 1e-5) {
-            return m4.identity();
-        }
+    // UPDATE OBJECTS FUNCTIONS
 
-        twgl.v3.normalize(axisToRotate, axisToRotate);
+    function updateStoneScale(){
+        const newScaleFactor = stone.data.tempScale;
+        const previousScaleFactor = stone.data.scale;
+        stone.data.scale = newScaleFactor;     
+        const scaleRatio = newScaleFactor / previousScaleFactor;
+        objects.stones.forEach(stoneNode => {
+            stoneNode.localMatrix = m4.scale(stoneNode.localMatrix, scaleRatio, scaleRatio, scaleRatio);
+        });
+    }
+    
+    function updateTreeScale(){
+        const newScaleFactor = tree.data.tempScale;
+        const previousScaleFactor = tree.data.scale;
+        tree.data.scale = newScaleFactor;     
+        const scaleRatio = newScaleFactor / previousScaleFactor;
+        objects.trees.forEach(treeNode => {
+            treeNode.localMatrix = m4.scale(treeNode.localMatrix, scaleRatio, scaleRatio, scaleRatio);
+        });
+    }
 
-        const rotationInRadians = twgl.v3.dot(normalizedUp, normalizedTargetVector);
-        const rotationAngle = Math.acos(Math.min(1, Math.max(-1, rotationInRadians)));
+    function updateStonesPlacement() {
+        objects.stones.forEach(stone => stone.setParent(null));
+        objects.stones = [];
+        
+        const planetNode = objects.planets[0];
+        
+        const stonePositions = generateRandomPositions(stone.data.numberOf, 1000, stone.data.minDistanceBetweenObjects, planet.data.waterAltitude, 1.0);
+        console.log(`Generated ${stonePositions.length} stones.`);
+        
+        objects.stones = stonePositions.map(position => {
+            const stoneNode = new Node();
+            stoneNode.setParent(planetNode);
+            const stoneAltitude = twgl.v3.length(position);
+            const rockAltitude = planet.getAltitude(planet.data.rockAltitude);
+            const stoneOnIce = stoneAltitude > rockAltitude;
+            const stoneColor = stoneOnIce ? stone.data.stoneIceColor : stone.data.stoneNormalColor;
+            stoneNode.drawInfo = {
+                vertexArray: stoneVAO,       
+                programInfo: stoneProgramInfo,
+                bufferInfo: stoneBufferInfo,
+                uniforms: {
+                    u_color: stoneColor,
+                    u_shininess: stoneOnIce ? stone.data.shininess : stone.data.shininess / 2
+                }
+            };
 
-        return m4.axisRotate(m4.identity(), axisToRotate, rotationAngle);
-}
+            const normal = twgl.v3.normalize(position);
+            const look = m4.lookAt([0,0,0], normal, [0,1,0]);
+            const rotationMatrix = m4.inverse(look);
+            const translationMatrix = m4.translation(position[0], position[1], position[2]);
+            let localMatrix = m4.multiply(translationMatrix, rotationMatrix);
+            const scaleFactor = stone.getRandomScaleFactor() * stone.data.scale;
+            localMatrix = m4.scale(localMatrix, scaleFactor, scaleFactor, scaleFactor);
+
+            stoneNode.localMatrix = localMatrix;
+
+            return stoneNode;
+        });
+    }
 
     function updateTreesPlacement() {
         objects.trees.forEach(tree => {
@@ -363,7 +415,6 @@ function main() {
         updateStar();
     }
 
-
     function updateLight() {
         const shininessFactor = star.data.generalShininessFactor;
         objects.stones.forEach(stoneNode => 
@@ -379,6 +430,8 @@ function main() {
 
         planetNode.drawInfo.uniforms.u_shininess = planet.data.shininess / shininessFactor;
     }
+
+    // UPDATE COLOR FUNCTIONS
 
     function updateStoneColor() {
         objects.stones.forEach(stoneNode => {
@@ -427,6 +480,8 @@ function main() {
             });
         });
     }
+
+    // RENDER LOGIC
     
     updatePlanet();
 
@@ -448,10 +503,6 @@ function main() {
         const fov = cameraData.fov * Math.PI / 180;
         const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
         return m4.perspective(fov, aspect, 0.1, 150);
-    }
-
-    function getAngleInRadians(degrees) {
-        return degrees * Math.PI / 180;
     }
 
     function updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix) {
@@ -534,7 +585,7 @@ function main() {
         requestAnimationFrame(drawScene);
     }
 
-    setupAllUI(planet, cameraData, stone, tree, star, {
+    setupUI(planet, cameraData, stone, tree, star, {
         updatePlanet,
         drawScene,
         updateNoisePersistence,

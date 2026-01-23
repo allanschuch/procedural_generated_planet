@@ -1,6 +1,6 @@
 "use strict";
 
-function setupAllUI(planet, cameraData, stone, tree, star, callbacks) {
+function setupUI(planet, cameraData, stone, tree, star, callbacks) {
     
     const { 
         updatePlanet, 
