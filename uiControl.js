@@ -72,5 +72,6 @@ function setupAllUI(planet, cameraData, stone, tree, star, callbacks) {
         { type: "slider", key: "orbitSpeed", min: 0, max: 100, precision: 0, name: "Orbit Speed" },
         { type: "slider", key: "generalShininessFactor", change: updateLight, min: 0.01, max: 3, precision: 2, step: 0.01, name: "Shininess Scale" },
         { type: "color", key: "color", change: updateStarColor, name: "Color" },
+        { type: "slider", key: "lightLimitAngle", min: 0, max: 180, precision: 0, step: 1, name: "Light Angle" },
     ]);
 }

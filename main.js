@@ -179,7 +179,7 @@ function main() {
                 bufferInfo: foliageBufferInfo,
                 uniforms: {
                     u_color: foliageColor,
-                    u_shininess: tree.data.shininess
+                    u_shininess: tree.data.shininess * star.data.generalShininessFactor
                 }
             };
 
@@ -456,6 +456,10 @@ function main() {
 
     function updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix) {
         const drawables = [];
+        const lightWorldPosition = starNode.worldMatrix.slice(12, 15);
+        const lightDirection = twgl.v3.normalize(twgl.v3.subtract([0,0,0], lightWorldPosition));
+        const lightInnerLimitAngleCos = Math.cos(getAngleInRadians(star.data.lightLimitAngle));
+        const lightOuterLimitAngleCos = Math.cos(getAngleInRadians(star.data.lightLimitAngle + 15));
 
         Object.keys(objects).forEach(objectType => {
             objects[objectType].forEach(object => {
@@ -463,7 +467,9 @@ function main() {
                 object.drawInfo.uniforms.u_worldMatrix = object.worldMatrix;
                 object.drawInfo.uniforms.u_viewProjectionMatrix = viewProjectionMatrix;
                 object.drawInfo.uniforms.u_inverseTransposedWorldMatrix = m4.transpose(m4.inverse(object.worldMatrix));
-                const lightWorldPosition = starNode.worldMatrix.slice(12, 15);
+                object.drawInfo.uniforms.u_lightDirection = lightDirection;
+                object.drawInfo.uniforms.u_lightInnerLimit = lightInnerLimitAngleCos;
+                object.drawInfo.uniforms.u_lightOuterLimit = lightOuterLimitAngleCos;
                 object.drawInfo.uniforms.u_lightWorldPosition = lightWorldPosition;
                 object.drawInfo.uniforms.u_ambientLight = star.data.ambientLight;
                 object.drawInfo.uniforms.u_specularColor = star.data.color;

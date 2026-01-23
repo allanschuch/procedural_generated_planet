@@ -85,6 +85,10 @@ class Planet {
         in vec3 v_surfaceToLight;
         in vec3 v_surfaceToView;
 
+        uniform vec3 u_lightDirection;
+        uniform float u_lightInnerLimit;
+        uniform float u_lightOuterLimit;
+
         uniform float u_ambientLight;
         uniform vec4 u_specularColor;
         uniform vec4 u_diffuseColor;
@@ -113,12 +117,14 @@ class Planet {
             vec3 surfaceToViewDirection = normalize(v_surfaceToView);
             vec3 halfVector = normalize(surfaceToLightDirection + surfaceToViewDirection);
 
-            float diffuseLight = max(dot(normal, surfaceToLightDirection), 0.0);
             float specularLight = 0.0;
-            if (diffuseLight > 0.0) {
-                specularLight = pow(max(dot(normal, halfVector), 0.0), u_shininess);
-            }
+            float diffuseLight = 0.0;
+            float dotFromDirection = dot(surfaceToLightDirection, -u_lightDirection);
 
+            float inLight = smoothstep(u_lightOuterLimit, u_lightInnerLimit, dotFromDirection);
+            diffuseLight = inLight * max(dot(normal, surfaceToLightDirection), 0.0);
+            specularLight = inLight * pow(max(dot(normal, halfVector), 0.0), u_shininess);
+             
             // Lets multiply just the color portion (not the alpha)
             // by the light
              
@@ -358,15 +364,14 @@ class PlanetObject {
         in vec3 v_surfaceToLight;
         in vec3 v_surfaceToView;
 
+        uniform vec3 u_lightDirection;
+        uniform float u_lightInnerLimit;
+        uniform float u_lightOuterLimit;
+
         uniform float u_ambientLight;
         uniform vec4 u_specularColor;
         uniform vec4 u_diffuseColor;
         uniform float u_shininess;
-        
-        uniform float u_waterAltitude;
-        uniform float u_sandAltitude;
-        uniform float u_grassAltitude;
-        uniform float u_rockAltitude;
         
         uniform vec4 u_color;
         
@@ -382,19 +387,22 @@ class PlanetObject {
             vec3 surfaceToViewDirection = normalize(v_surfaceToView);
             vec3 halfVector = normalize(surfaceToLightDirection + surfaceToViewDirection);
 
-            float diffuseLight = max(dot(normal, surfaceToLightDirection), 0.0);
             float specularLight = 0.0;
-            if (diffuseLight > 0.0) {
-                specularLight = pow(max(dot(normal, halfVector), 0.0), u_shininess);
-            }
+            float diffuseLight = 0.0;
+            float dotFromDirection = dot(surfaceToLightDirection, -u_lightDirection);
 
+            float inLight = smoothstep(u_lightOuterLimit, u_lightInnerLimit, dotFromDirection);
+            diffuseLight = inLight * max(dot(normal, surfaceToLightDirection), 0.0);
+            specularLight = inLight * pow(max(dot(normal, halfVector), 0.0), u_shininess);
+             
             // Lets multiply just the color portion (not the alpha)
             // by the light
+            
+            vec3 base_color = u_color.rgb;
 
-            vec3 baseColor = u_color.rgb;
             vec3 diffuseColor = u_diffuseColor.rgb;
-            vec3 ambient = baseColor * u_ambientLight;
-            vec3 diffuse = baseColor * diffuseLight * diffuseColor;
+            vec3 ambient = base_color * u_ambientLight;
+            vec3 diffuse = base_color * diffuseLight * diffuseColor;
             vec3 specular = u_specularColor.rgb * specularLight;
             vec3 finalColor = ambient + diffuse + specular;
 
@@ -485,7 +493,8 @@ class Star {
             color: [1.0, 1.0, 0.8, 1.0],
             specularColor: [1.0, 1.0, 1.0, 1.0],
             ambientLight: 0.3,
-            generalShininessFactor: 1.0
+            generalShininessFactor: 1.0,
+            lightLimitAngle: 30,
         };
     }
 
