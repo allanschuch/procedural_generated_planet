@@ -46,7 +46,8 @@ function setupUI(planet, cameraData, stone, tree, star, callbacks) {
         { type: "slider", key: "fov", min: 10, max: 120, precision: 0, name: "Field of View" },
         { type: "slider", key: "angle", min: -180, max: 180, precision: 0, name: "Angle" },
         { type: "slider", key: "height", min: -20, max: 20, precision: 1, step: 0.1, name: "Height" },
-        
+        { type: "slider", key: "nearPlane", min: 0.01, max: 1, precision: 2, step: 0.01, name: "Near Plane" },
+        { type: "slider", key: "farPlane", min: 50, max: 200, precision: 0, step: 1, name: "Far Plane" },
     ]);
 
     webglLessonsUI.setupUI(document.querySelector("#ui-stones"), stone.data, [
@@ -73,5 +74,6 @@ function setupUI(planet, cameraData, stone, tree, star, callbacks) {
         { type: "slider", key: "generalShininessFactor", change: updateLight, min: 0.01, max: 3, precision: 2, step: 0.01, name: "Shininess Scale" },
         { type: "color", key: "color", change: updateStarColor, name: "Color" },
         { type: "slider", key: "lightLimitAngle", min: 0, max: 180, precision: 0, step: 1, name: "Light Angle" },
+        { type: "slider", key: "shadowLightFOV", min: 11, max: 180, precision: 0, step: 1, name: "ShadowMap FOV" },
     ]);
 }

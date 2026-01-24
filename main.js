@@ -28,29 +28,32 @@ function main() {
     const shadowMapFS =
         `#version 300 es
         precision highp float;
+
+        out vec4 outColor;
+
         void main() {
-            // gl_FragDepth is set automatically
+            outColor = vec4(1.0);
         }
         `;
     
     const shadowMapConfig = createShadowMapFramebuffer();
 
+    const shadowMapProgramInfo = twgl.createProgramInfo(gl, [shadowMapVS, shadowMapFS], programOptions);
+    const planetObjectProgramInfo = twgl.createProgramInfo(gl, [PlanetObject.VS, PlanetObject.FS], programOptions);
+    const planetProgramInfo = twgl.createProgramInfo(gl, [Planet.VS, Planet.FS], programOptions);
+    const starProgramInfo = twgl.createProgramInfo(gl, [Star.VS, Star.FS], programOptions);
+
     // PLANET AND STAR CONFIG
 
     const planet = new Planet();
 
-    const planetProgramInfo = twgl.createProgramInfo(gl, [planet.getVS(), planet.getFS()], programOptions);
-    const planetShadowMapProgramInfo = twgl.createProgramInfo(gl, [shadowMapVS, shadowMapFS], programOptions);
     let planetBufferInfo = null;
     let planetVAO = null;
     const planetNode = new Node();
     planetNode.localMatrix = m4.identity();
 
     const star = new Star();
-
-    const starProgramInfo = twgl.createProgramInfo(gl, [star.getVS(), star.getFS()], programOptions);
-    const starShadowMapProgramInfo = twgl.createProgramInfo(gl, [shadowMapVS, shadowMapFS], programOptions);
-
+    
     let starBufferInfo = null;
     let starVAO = null;
     const starNode = new Node();
@@ -68,27 +71,22 @@ function main() {
 
     const stone = new Stone();
 
-    const stoneProgramInfo = twgl.createProgramInfo(gl, [stone.getVS(), stone.getFS()], programOptions);
-    const stoneShadowMapProgramInfo = twgl.createProgramInfo(gl, [shadowMapVS, shadowMapFS], programOptions);
 
     const stoneArrays = stone.getStoneArrays(planet.data.radius);
     let stoneBufferInfo = twgl.createBufferInfoFromArrays(gl, stoneArrays);
-    let stoneVAO = twgl.createVAOFromBufferInfo(gl, stoneProgramInfo, stoneBufferInfo);
+    let stoneVAO = twgl.createVAOFromBufferInfo(gl, planetObjectProgramInfo, stoneBufferInfo);
 
     // TREES CONFIG
 
     const tree = new Tree();
 
-    const treeProgramInfo = twgl.createProgramInfo(gl, [tree.getVS(), tree.getFS()], programOptions);
-    const treeShadowMapProgramInfo = twgl.createProgramInfo(gl, [shadowMapVS, shadowMapFS], programOptions);
-
     const foliageArrays = tree.getFoliageArrays(planet.data.radius);
     let foliageBufferInfo = twgl.createBufferInfoFromArrays(gl, foliageArrays);
-    let foliageVAO = twgl.createVAOFromBufferInfo(gl, treeProgramInfo, foliageBufferInfo);
+    let foliageVAO = twgl.createVAOFromBufferInfo(gl, planetObjectProgramInfo, foliageBufferInfo);
     
     const trunkArrays = tree.getTrunkArrays(planet.data.radius);
     let trunkBufferInfo = twgl.createBufferInfoFromArrays(gl, trunkArrays);
-    let trunkVAO = twgl.createVAOFromBufferInfo(gl, treeProgramInfo, trunkBufferInfo);
+    let trunkVAO = twgl.createVAOFromBufferInfo(gl, planetObjectProgramInfo, trunkBufferInfo);
 
     // OBJECTS
 
@@ -107,7 +105,7 @@ function main() {
 
     function createShadowMapFramebuffer() {
         const depthTexture = gl.createTexture();
-        const depthTextureSize = 512;
+        const depthTextureSize = 2048;
         gl.bindTexture(gl.TEXTURE_2D, depthTexture);
         gl.texImage2D(
             gl.TEXTURE_2D,      // target
@@ -208,7 +206,7 @@ function main() {
             foliageNode.setParent(foliageGroupNode);
             foliageNode.drawInfo = {
                 vertexArray: foliageVAO,
-                programInfo: treeProgramInfo,
+                programInfo: planetObjectProgramInfo,
                 bufferInfo: foliageBufferInfo,
                 uniforms: {
                     u_color: foliageColor,
@@ -260,7 +258,7 @@ function main() {
         trunkNode.setParent(treeNode);
         trunkNode.drawInfo = {
             vertexArray: trunkVAO,
-            programInfo: treeProgramInfo,
+            programInfo: planetObjectProgramInfo,
             bufferInfo: trunkBufferInfo,
             uniforms: {
                 u_color: tree.data.trunkColor,
@@ -324,7 +322,7 @@ function main() {
             const stoneColor = stoneOnIce ? stone.data.stoneIceColor : stone.data.stoneNormalColor;
             stoneNode.drawInfo = {
                 vertexArray: stoneVAO,       
-                programInfo: stoneProgramInfo,
+                programInfo: planetObjectProgramInfo,
                 bufferInfo: stoneBufferInfo,
                 uniforms: {
                     u_color: stoneColor,
@@ -450,7 +448,7 @@ function main() {
         objects.trunks.forEach(trunkNode =>
             trunkNode.drawInfo.uniforms.u_shininess = tree.data.shininess / shininessFactor);
        
-        foliageNodes.forEach(foliageNode => {
+        objects.foliages.forEach(foliageNode => {
             foliageNode.drawInfo.uniforms.u_shininess = tree.data.shininess / shininessFactor
         });
 
@@ -511,7 +509,7 @@ function main() {
     
     updatePlanet();
 
-    const cameraData = { zoom: 10, fov: 45, angle: 0, height: 0};
+    const cameraData = { zoom: 10, fov: 45, angle: 0, height: 0, nearPlane: 0.1, farPlane: 150};
 
     function setCameraMatrix() {
         const cameraRadius = 1/cameraData.zoom * 100;
@@ -526,35 +524,54 @@ function main() {
     }
 
     function setProjectionMatrix() {
-        const fov = cameraData.fov * Math.PI / 180;
+        const fov = getAngleInRadians(cameraData.fov);
         const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-        return m4.perspective(fov, aspect, 0.1, 150);
+        return m4.perspective(fov, aspect, cameraData.nearPlane, cameraData.farPlane);
     }
 
-    function updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix, programInfo) {
+    function updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix, isShadowPass = false, lightViewMatrix = null, cameraMatrix = null) {
         const drawables = [];
-        const lightWorldPosition = starNode.worldMatrix.slice(12, 15);
-        const lightDirection = twgl.v3.normalize(twgl.v3.subtract([0,0,0], lightWorldPosition));
-        const lightInnerLimitAngleCos = Math.cos(getAngleInRadians(star.data.lightLimitAngle));
-        const lightOuterLimitAngleCos = Math.cos(getAngleInRadians(star.data.lightLimitAngle + 15));
+        if (isShadowPass) {
+            Object.keys(objects).filter(objectType => 
+                objectType !== 'stars').forEach(objectType => {
+                    objects[objectType].forEach(object => {
+                        if (!object.drawInfo.programInfo) return;
+                        object.drawInfo.programInfo = shadowMapProgramInfo;
+                        object.drawInfo.uniforms.u_worldMatrix = object.worldMatrix;
+                        object.drawInfo.uniforms.u_lightViewProjectionMatrix = viewProjectionMatrix;
+                        drawables.push(object.drawInfo);
+                    });
+                });
+        } else {
+            const lightWorldPosition = starNode.worldMatrix.slice(12, 15);
+            const lightDirection = twgl.v3.normalize(twgl.v3.subtract([0,0,0], lightWorldPosition));
+            const lightInnerLimitAngleCos = Math.cos(getAngleInRadians(star.data.lightLimitAngle));
+            const lightOuterLimitAngleCos = Math.cos(getAngleInRadians(star.data.lightLimitAngle + 15));
 
-        Object.keys(objects).forEach(objectType => {
-            objects[objectType].forEach(object => {
-                if (!object.drawInfo.programInfo) return;
-                object.drawInfo.uniforms.u_worldMatrix = object.worldMatrix;
-                object.drawInfo.uniforms.u_viewProjectionMatrix = viewProjectionMatrix;
-                object.drawInfo.uniforms.u_inverseTransposedWorldMatrix = m4.transpose(m4.inverse(object.worldMatrix));
-                object.drawInfo.uniforms.u_lightDirection = lightDirection;
-                object.drawInfo.uniforms.u_lightInnerLimit = lightInnerLimitAngleCos;
-                object.drawInfo.uniforms.u_lightOuterLimit = lightOuterLimitAngleCos;
-                object.drawInfo.uniforms.u_lightWorldPosition = lightWorldPosition;
-                object.drawInfo.uniforms.u_ambientLight = star.data.ambientLight;
-                object.drawInfo.uniforms.u_specularColor = star.data.color;
-                object.drawInfo.uniforms.u_diffuseColor = star.data.color;
-                drawables.push(object.drawInfo);
+            Object.keys(objects).forEach(objectType => {
+                objects[objectType].forEach(object => {
+                    if (!object.drawInfo.programInfo) return;
+                    object.drawInfo.programInfo = objectType === 'stars' ? starProgramInfo :
+                        objectType === 'planets' ? planetProgramInfo :
+                        planetObjectProgramInfo;
+                    object.drawInfo.uniforms.u_worldMatrix = object.worldMatrix;
+                    object.drawInfo.uniforms.u_viewProjectionMatrix = viewProjectionMatrix;
+                    object.drawInfo.uniforms.u_inverseTransposedWorldMatrix = m4.transpose(m4.inverse(object.worldMatrix));
+                    object.drawInfo.uniforms.u_lightDirection = lightDirection;
+                    object.drawInfo.uniforms.u_lightInnerLimit = lightInnerLimitAngleCos;
+                    object.drawInfo.uniforms.u_lightOuterLimit = lightOuterLimitAngleCos;
+                    object.drawInfo.uniforms.u_lightWorldPosition = lightWorldPosition;
+                    object.drawInfo.uniforms.u_viewWorldPosition = cameraMatrix.slice(12, 15)
+                    object.drawInfo.uniforms.u_ambientLight = star.data.ambientLight;
+                    object.drawInfo.uniforms.u_specularColor = star.data.color;
+                    object.drawInfo.uniforms.u_diffuseColor = star.data.color;
+                    object.drawInfo.uniforms.u_projectedTexture = shadowMapConfig.texture;
+                    object.drawInfo.uniforms.u_textureMatrix = lightViewMatrix;
+                    drawables.push(object.drawInfo);
+                });
             });
-        });
-        
+        }
+
         return drawables;
     }
 
@@ -582,20 +599,19 @@ function main() {
 
     let lastTime = 0;
 
+    function getDeltaTime(currentTime) {
+        const deltaTime = currentTime - lastTime;
+        lastTime = currentTime;
+        return deltaTime;
+    }
+
     function drawScene(time) {
         time *= 0.001;
         twgl.resizeCanvasToDisplaySize(gl.canvas);
-        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+        gl.enable(gl.CULL_FACE);
         gl.enable(gl.DEPTH_TEST);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        const projectionMatrix = setProjectionMatrix();
-        const cameraMatrix = setCameraMatrix();
-        const viewMatrix = m4.inverse(cameraMatrix);
-        const viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
-
-        const deltaTime = time - lastTime;
-        lastTime = time;
+        const deltaTime = getDeltaTime(time);
 
         updateFoliageAnimation(deltaTime);
 
@@ -603,8 +619,34 @@ function main() {
         m4.yRotation(time * star.data.orbitSpeed * -0.02 || 0, starOrbitNode.localMatrix);
         
         systemNode.updateWorldMatrix();
-        
-        const objectsToDraw = updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix);
+
+        // SHADOW MAP PASS
+
+        const lightWorldPosition = starNode.worldMatrix.slice(12, 15);
+        const lightWorldMatrix = m4.lookAt(lightWorldPosition, [0,0,0], [0,1,0]);
+        const lightViewMatrix = m4.inverse(lightWorldMatrix);
+        const lightProjectionMatrix = m4.perspective(getAngleInRadians(star.data.shadowLightFOV), 1, cameraData.nearPlane, cameraData.farPlane);
+        const lightViewProjectionMatrix = m4.multiply(lightProjectionMatrix, lightViewMatrix);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, shadowMapConfig.framebuffer);
+        gl.viewport(0, 0, shadowMapConfig.size, shadowMapConfig.size);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        const objectsToDrawShadowMap = updateObjectsMatricesAndGetObjectsToDraw(lightViewProjectionMatrix, true);
+        twgl.drawObjectList(gl, objectsToDrawShadowMap);
+
+        // SCENE RENDER PASS
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        const projectionMatrix = setProjectionMatrix();
+        const cameraMatrix = setCameraMatrix();
+        const viewMatrix = m4.inverse(cameraMatrix);
+        const viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
+
+        const objectsToDraw = updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix, false, lightViewMatrix, cameraMatrix);
     
         twgl.drawObjectList(gl, objectsToDraw);
 

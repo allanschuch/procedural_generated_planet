@@ -25,7 +25,7 @@ class Planet {
             rockColor: [0.5, 0.5, 0.5, 1.0],
             snowColor: [1.0, 1.0, 1.0, 1.0],
             tempSnowColor: [1.0, 1.0, 1.0, 1.0],
-            shininess: 1.0,
+            shininess: 300.0,
         };
 
         this.uniforms = {};
@@ -34,27 +34,30 @@ class Planet {
         this.planetMaxAltitude = this.data.radius + this.data.noiseAmplitude;
     }
 
-    getVS() {
+    static get VS() {
         return `#version 300 es
         in vec4 a_position;
         in vec3 a_normal;
-
+    
         uniform mat4 u_worldMatrix;
         uniform mat4 u_viewProjectionMatrix;
         uniform mat4 u_inverseTransposedWorldMatrix;
+        uniform mat4 u_textureMatrix;
 
         uniform vec3 u_lightWorldPosition;
         uniform vec3 u_viewWorldPosition;
 
         out vec3 v_normal;
         out float v_height;
+        out vec4 v_projectedTexcoord;
 
         out vec3 v_surfaceToLight;
         out vec3 v_surfaceToView;
 
         void main() {
             // Multiply the position by the matrix.
-            gl_Position = u_viewProjectionMatrix * u_worldMatrix * a_position;
+            vec4 worldPosition = u_worldMatrix * a_position;
+            gl_Position = u_viewProjectionMatrix * worldPosition;
 
             // orient the normals and pass to the fragment shader
             v_normal = mat3(u_inverseTransposedWorldMatrix) * a_normal;
@@ -62,8 +65,8 @@ class Planet {
             v_height = length(a_position.xyz);
 
             // compute the world position of the surface
-            vec3 surfaceWorldPosition = (u_worldMatrix * a_position).xyz;
-            
+            vec3 surfaceWorldPosition = worldPosition.xyz;
+
             // compute the vector of the surface to the light
             // and pass it to the fragment shader
             v_surfaceToLight = u_lightWorldPosition - surfaceWorldPosition;
@@ -71,19 +74,23 @@ class Planet {
             // compute the vector of the surface to the view/camera
             // and pass it to the fragment shader
             v_surfaceToView = u_viewWorldPosition - surfaceWorldPosition;
+
+            v_projectedTexcoord = u_textureMatrix * worldPosition;
         }
         `;
     }
 
-    getFS() {
+    static get FS() {
         return `#version 300 es
         precision highp float;
 
-        in vec3 v_normal;
         in float v_height;
-
+        in vec4 v_projectedTexcoord;
+        in vec3 v_normal;
         in vec3 v_surfaceToLight;
         in vec3 v_surfaceToView;
+
+        uniform sampler2D u_projectedTexture;
 
         uniform vec3 u_lightDirection;
         uniform float u_lightInnerLimit;
@@ -108,6 +115,22 @@ class Planet {
         out vec4 out_color;
 
         void main() {
+            // divide by w to get the correct value. See article on perspective
+            vec3 projectedTexcoord = v_projectedTexcoord.xyz / v_projectedTexcoord.w;
+            float currentDepth = projectedTexcoord.z;
+
+            bool inRange = 
+                projectedTexcoord.x >= 0.0 &&
+                projectedTexcoord.x <= 1.0 &&
+                projectedTexcoord.y >= 0.0 &&
+                projectedTexcoord.y <= 1.0;
+
+            vec4 projectedTexColor = vec4(texture(u_projectedTexture, projectedTexcoord.xy).rrr, 1.0);
+            float projectedAmount = inRange ? 1.0 : 0.0;
+
+            float projectedDepth = texture(u_projectedTexture, projectedTexcoord.xy).r;
+            float shadowLight = (inRange && projectedDepth <= currentDepth) ? 0.0 : 1.0;  
+
             // because v_normal is a varying it's interpolated
             // so it will not be a unit vector. Normalizing it
             // will make it a unit vector again
@@ -142,7 +165,7 @@ class Planet {
 
             finalColor = clamp(finalColor, 0.0, 1.0);
 
-            out_color = vec4(finalColor, 1.0);
+            out_color = vec4(finalColor, 1.0) * vec4(shadowLight);
         }
         `;
         
@@ -309,11 +332,11 @@ class PlanetObject {
             minScaleFactor: 0.5,
             maxScaleFactor: 2.0,
             minDistanceBetweenObjects: 1.4,
-            shininess: 80.0,
+            shininess: 140.0,
         };
     }
 
-    getVS() {
+    static get VS() {
         return `#version 300 es
         in vec4 a_position;
         in vec3 a_normal;
@@ -354,7 +377,7 @@ class PlanetObject {
         `;
     }
 
-    getFS() {
+    static get FS() {
         return `#version 300 es
         precision highp float;
 
@@ -429,7 +452,7 @@ class Stone extends PlanetObject {
             stoneIceColor: [0.65, 0.95, 0.95, 1.0],
             tempStoneIceColor: [0.65, 0.95, 0.95, 1.0],
             minDistanceBetweenObjects: 0.2,
-            shininess: 40.0,
+            shininess: 80.0,
         };
 
     }
@@ -494,10 +517,11 @@ class Star {
             ambientLight: 0.3,
             generalShininessFactor: 1.0,
             lightLimitAngle: 30,
+            shadowLightFOV: 180
         };
     }
 
-    getVS() {
+    static get VS() {
         return `#version 300 es
         in vec4 a_position;
         in vec3 a_normal;
@@ -515,7 +539,7 @@ class Star {
         `;
     }
 
-    getFS() {
+    static get FS() {
         return `#version 300 es
         precision highp float;
 
