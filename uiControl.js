@@ -15,7 +15,8 @@ function setupUI(planet, cameraData, stone, tree, star, callbacks) {
         updatePlanetSnowColor,
         updateTreeColor,
         updateStoneColor,
-        updateStarColor   
+        updateStarColor,
+        updateShadowMapSize   
     } = callbacks;
 
     webglLessonsUI.setupUI(document.querySelector("#ui-planet"), planet.data, [
@@ -69,11 +70,11 @@ function setupUI(planet, cameraData, stone, tree, star, callbacks) {
     ]);
 
     webglLessonsUI.setupUI(document.querySelector("#ui-star"), star.data, [
-        { type: "slider", key: "distanceFromPlanetFactor", change: updateStar, min: 0.1, max: 3.0, precision: 2, step: 0.1, name: "Distance" },
+        { type: "slider", key: "distanceFromPlanetFactor", change: updateStar, min: 0.1, max: 4.0, precision: 2, step: 0.1, name: "Distance" },
         { type: "slider", key: "orbitSpeed", min: 0, max: 100, precision: 0, name: "Orbit Speed" },
         { type: "slider", key: "generalShininessFactor", change: updateLight, min: 0.01, max: 3, precision: 2, step: 0.01, name: "Shininess Scale" },
-        { type: "color", key: "color", change: updateStarColor, name: "Color" },
         { type: "slider", key: "lightLimitAngle", min: 0, max: 180, precision: 0, step: 1, name: "Light Angle" },
-        { type: "slider", key: "shadowLightFOV", min: 11, max: 180, precision: 0, step: 1, name: "ShadowMap FOV" },
+        { type: "slider", key: "shadowMapTextureSize", change: updateShadowMapSize, min: 128, max: 4096, precision: 0, step: 128, name: "Shadow Tex Size" },
+        { type: "color", key: "color", change: updateStarColor, name: "Color" },
     ]);
 }

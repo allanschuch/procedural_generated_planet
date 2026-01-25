@@ -6,6 +6,11 @@ function main() {
     if (!gl) return;
     twgl.setDefaults({attribPrefix: "a_"});
 
+    const planet = new Planet();
+    const star = new Star();
+    const stone = new Stone();
+    const tree = new Tree();
+
     const programOptions = {
         attribLocations: {
             'a_position': 0,
@@ -29,31 +34,23 @@ function main() {
         `#version 300 es
         precision highp float;
 
-        out vec4 outColor;
-
         void main() {
-            outColor = vec4(1.0);
         }
         `;
-    
+         
     const shadowMapConfig = createShadowMapFramebuffer();
-
     const shadowMapProgramInfo = twgl.createProgramInfo(gl, [shadowMapVS, shadowMapFS], programOptions);
     const planetObjectProgramInfo = twgl.createProgramInfo(gl, [PlanetObject.VS, PlanetObject.FS], programOptions);
     const planetProgramInfo = twgl.createProgramInfo(gl, [Planet.VS, Planet.FS], programOptions);
     const starProgramInfo = twgl.createProgramInfo(gl, [Star.VS, Star.FS], programOptions);
-
+    
     // PLANET AND STAR CONFIG
-
-    const planet = new Planet();
-
+    
     let planetBufferInfo = null;
     let planetVAO = null;
     const planetNode = new Node();
     planetNode.localMatrix = m4.identity();
 
-    const star = new Star();
-    
     let starBufferInfo = null;
     let starVAO = null;
     const starNode = new Node();
@@ -69,16 +66,11 @@ function main() {
 
     // STONES CONFIG
 
-    const stone = new Stone();
-
-
     const stoneArrays = stone.getStoneArrays(planet.data.radius);
     let stoneBufferInfo = twgl.createBufferInfoFromArrays(gl, stoneArrays);
     let stoneVAO = twgl.createVAOFromBufferInfo(gl, planetObjectProgramInfo, stoneBufferInfo);
 
     // TREES CONFIG
-
-    const tree = new Tree();
 
     const foliageArrays = tree.getFoliageArrays(planet.data.radius);
     let foliageBufferInfo = twgl.createBufferInfoFromArrays(gl, foliageArrays);
@@ -105,7 +97,7 @@ function main() {
 
     function createShadowMapFramebuffer() {
         const depthTexture = gl.createTexture();
-        const depthTextureSize = 2048;
+        const depthTextureSize = star.data.shadowMapTextureSize;
         gl.bindTexture(gl.TEXTURE_2D, depthTexture);
         gl.texImage2D(
             gl.TEXTURE_2D,      // target
@@ -132,7 +124,33 @@ function main() {
             0);                   // mip level
         
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        return { framebuffer: depthFramebuffer, texture: depthTexture, size: depthTextureSize };
+        return { framebuffer: depthFramebuffer, texture: depthTexture  };
+    }
+
+    function updateShadowMapSize() {
+        const depthTextureSize = star.data.shadowMapTextureSize;
+        gl.bindTexture(gl.TEXTURE_2D, shadowMapConfig.texture);
+        gl.texImage2D(
+            gl.TEXTURE_2D,      
+            0,                  
+            gl.DEPTH_COMPONENT32F,
+            depthTextureSize,  
+            depthTextureSize,   
+            0,                 
+            gl.DEPTH_COMPONENT, 
+            gl.FLOAT,           
+            null);
+    }
+
+    function getShadowMappingFOVAngleInRadians() {
+        const lightWorldPosition = starNode.worldMatrix.slice(12, 15);
+        const lightDistToPlanetCenter = twgl.v3.length(lightWorldPosition);
+        const treeFoliageHeight = tree.data.foliageRadiusFactor * planet.data.radius * tree.data.scale * 2;
+        const treeTrunkHeight = tree.data.trunkHeightFactor * planet.data.radius * tree.data.scale;
+        const planetRadiusWithTrees = planet.data.radius + planet.data.noiseAmplitude + treeFoliageHeight + treeTrunkHeight;
+        let shadowHalfFOV = Math.asin(planetRadiusWithTrees / lightDistToPlanetCenter);
+        shadowHalfFOV *= 1.1;
+        return shadowHalfFOV * 2;
     }
 
     function getRandomPositionOnPlanetSurface() {
@@ -302,6 +320,7 @@ function main() {
         objects.trees.forEach(treeNode => {
             treeNode.localMatrix = m4.scale(treeNode.localMatrix, scaleRatio, scaleRatio, scaleRatio);
         });
+        updateStar();
     }
 
     function updateStonesPlacement() {
@@ -311,7 +330,6 @@ function main() {
         const planetNode = objects.planets[0];
         
         const stonePositions = generateRandomPositions(stone.data.numberOf, 1000, stone.data.minDistanceBetweenObjects, planet.data.waterAltitude, 1.0);
-        console.log(`Generated ${stonePositions.length} stones.`);
         
         objects.stones = stonePositions.map(position => {
             const stoneNode = new Node();
@@ -363,7 +381,6 @@ function main() {
         const planetNode = objects.planets[0];
         
         const treePositions = generateRandomPositions(tree.data.numberOf, 1000, tree.data.minDistanceBetweenObjects, planet.data.sandAltitude, planet.data.grassAltitude, planet.data.rockAltitude, 1.0);
-        console.log(`Generated ${treePositions.length} trees.`);
         
         objects.trees = treePositions.map(position => {
             const treeNode = new Node();
@@ -407,7 +424,7 @@ function main() {
 
         starNode.drawInfo.uniforms.u_color = star.data.color;
 
-        const treeFoliageHeight = tree.data.foliageRadiusFactor * planet.data.radius * tree.data.scale;
+        const treeFoliageHeight = tree.data.foliageRadiusFactor * planet.data.radius * tree.data.scale * 2;
         const treeTrunkHeight = tree.data.trunkHeightFactor * planet.data.radius * tree.data.scale;
         const planetRadiusWithTrees = planet.data.radius + planet.data.noiseAmplitude + treeFoliageHeight + treeTrunkHeight;
         const distanceFromPlanet = star.data.distanceFromPlanetFactor * planet.data.radius + planetRadiusWithTrees;
@@ -529,7 +546,7 @@ function main() {
         return m4.perspective(fov, aspect, cameraData.nearPlane, cameraData.farPlane);
     }
 
-    function updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix, isShadowPass = false, lightViewMatrix = null, cameraMatrix = null) {
+    function updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix, isShadowPass = false, cameraMatrix = null, shadowMapTextureMatrix = null) {
         const drawables = [];
         if (isShadowPass) {
             Object.keys(objects).filter(objectType => 
@@ -561,12 +578,13 @@ function main() {
                     object.drawInfo.uniforms.u_lightInnerLimit = lightInnerLimitAngleCos;
                     object.drawInfo.uniforms.u_lightOuterLimit = lightOuterLimitAngleCos;
                     object.drawInfo.uniforms.u_lightWorldPosition = lightWorldPosition;
-                    object.drawInfo.uniforms.u_viewWorldPosition = cameraMatrix.slice(12, 15)
+                    object.drawInfo.uniforms.u_viewWorldPosition = cameraMatrix.slice(12, 15);
                     object.drawInfo.uniforms.u_ambientLight = star.data.ambientLight;
                     object.drawInfo.uniforms.u_specularColor = star.data.color;
                     object.drawInfo.uniforms.u_diffuseColor = star.data.color;
                     object.drawInfo.uniforms.u_projectedTexture = shadowMapConfig.texture;
-                    object.drawInfo.uniforms.u_textureMatrix = lightViewMatrix;
+                    object.drawInfo.uniforms.u_textureMatrix = shadowMapTextureMatrix;
+                    object.drawInfo.uniforms.u_bias = star.data.shadowMapBias;
                     drawables.push(object.drawInfo);
                 });
             });
@@ -625,11 +643,17 @@ function main() {
         const lightWorldPosition = starNode.worldMatrix.slice(12, 15);
         const lightWorldMatrix = m4.lookAt(lightWorldPosition, [0,0,0], [0,1,0]);
         const lightViewMatrix = m4.inverse(lightWorldMatrix);
-        const lightProjectionMatrix = m4.perspective(getAngleInRadians(star.data.shadowLightFOV), 1, cameraData.nearPlane, cameraData.farPlane);
+        const lightProjectionMatrix = m4.perspective(getShadowMappingFOVAngleInRadians(), 1, cameraData.nearPlane, cameraData.farPlane);
         const lightViewProjectionMatrix = m4.multiply(lightProjectionMatrix, lightViewMatrix);
 
+        let shadowMapTextureMatrix = m4.identity();
+        shadowMapTextureMatrix = m4.translate(shadowMapTextureMatrix, 0.5, 0.5, 0.5);
+        shadowMapTextureMatrix = m4.scale(shadowMapTextureMatrix, 0.5, 0.5, 0.5);
+        shadowMapTextureMatrix = m4.multiply(shadowMapTextureMatrix, lightProjectionMatrix);
+        shadowMapTextureMatrix = m4.multiply(shadowMapTextureMatrix, lightViewMatrix);
+
         gl.bindFramebuffer(gl.FRAMEBUFFER, shadowMapConfig.framebuffer);
-        gl.viewport(0, 0, shadowMapConfig.size, shadowMapConfig.size);
+        gl.viewport(0, 0, star.data.shadowMapTextureSize, star.data.shadowMapTextureSize);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         const objectsToDrawShadowMap = updateObjectsMatricesAndGetObjectsToDraw(lightViewProjectionMatrix, true);
@@ -646,12 +670,12 @@ function main() {
         const viewMatrix = m4.inverse(cameraMatrix);
         const viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
 
-        const objectsToDraw = updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix, false, lightViewMatrix, cameraMatrix);
+        const objectsToDraw = updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix, false, cameraMatrix, shadowMapTextureMatrix);
     
         twgl.drawObjectList(gl, objectsToDraw);
-
+        
         requestAnimationFrame(drawScene);
-    }
+}
 
     setupUI(planet, cameraData, stone, tree, star, {
         updatePlanet,
@@ -667,7 +691,8 @@ function main() {
         updatePlanetSnowColor,
         updateTreeColor,
         updateStoneColor,
-        updateStarColor
+        updateStarColor,
+        updateShadowMapSize
     });
 
     requestAnimationFrame(drawScene);

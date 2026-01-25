@@ -25,7 +25,7 @@ class Planet {
             rockColor: [0.5, 0.5, 0.5, 1.0],
             snowColor: [1.0, 1.0, 1.0, 1.0],
             tempSnowColor: [1.0, 1.0, 1.0, 1.0],
-            shininess: 300.0,
+            shininess: 5000.0,
         };
 
         this.uniforms = {};
@@ -95,6 +95,7 @@ class Planet {
         uniform vec3 u_lightDirection;
         uniform float u_lightInnerLimit;
         uniform float u_lightOuterLimit;
+        uniform float u_bias;
 
         uniform float u_ambientLight;
         uniform vec4 u_specularColor;
@@ -117,16 +118,13 @@ class Planet {
         void main() {
             // divide by w to get the correct value. See article on perspective
             vec3 projectedTexcoord = v_projectedTexcoord.xyz / v_projectedTexcoord.w;
-            float currentDepth = projectedTexcoord.z;
+            float currentDepth = projectedTexcoord.z + u_bias;
 
             bool inRange = 
                 projectedTexcoord.x >= 0.0 &&
                 projectedTexcoord.x <= 1.0 &&
                 projectedTexcoord.y >= 0.0 &&
                 projectedTexcoord.y <= 1.0;
-
-            vec4 projectedTexColor = vec4(texture(u_projectedTexture, projectedTexcoord.xy).rrr, 1.0);
-            float projectedAmount = inRange ? 1.0 : 0.0;
 
             float projectedDepth = texture(u_projectedTexture, projectedTexcoord.xy).r;
             float shadowLight = (inRange && projectedDepth <= currentDepth) ? 0.0 : 1.0;  
@@ -159,16 +157,14 @@ class Planet {
 
             vec3 diffuseColor = u_diffuseColor.rgb;
             vec3 ambient = base_color * u_ambientLight;
-            vec3 diffuse = base_color * diffuseLight * diffuseColor;
-            vec3 specular = u_specularColor.rgb * specularLight;
+            vec3 diffuse = base_color * diffuseLight * diffuseColor * shadowLight;
+            vec3 specular = u_specularColor.rgb * specularLight * shadowLight;
             vec3 finalColor = ambient + diffuse + specular;
 
             finalColor = clamp(finalColor, 0.0, 1.0);
-
-            out_color = vec4(finalColor, 1.0) * vec4(shadowLight);
+            out_color = vec4(finalColor, 1.0);
         }
         `;
-        
     }
 
     lerp(a, b, t) {
@@ -340,23 +336,26 @@ class PlanetObject {
         return `#version 300 es
         in vec4 a_position;
         in vec3 a_normal;
-
+    
         uniform mat4 u_worldMatrix;
         uniform mat4 u_viewProjectionMatrix;
         uniform mat4 u_inverseTransposedWorldMatrix;
+        uniform mat4 u_textureMatrix;
 
         uniform vec3 u_lightWorldPosition;
         uniform vec3 u_viewWorldPosition;
 
         out vec3 v_normal;
         out float v_height;
+        out vec4 v_projectedTexcoord;
 
         out vec3 v_surfaceToLight;
         out vec3 v_surfaceToView;
 
         void main() {
             // Multiply the position by the matrix.
-            gl_Position = u_viewProjectionMatrix * u_worldMatrix * a_position;
+            vec4 worldPosition = u_worldMatrix * a_position;
+            gl_Position = u_viewProjectionMatrix * worldPosition;
 
             // orient the normals and pass to the fragment shader
             v_normal = mat3(u_inverseTransposedWorldMatrix) * a_normal;
@@ -364,8 +363,8 @@ class PlanetObject {
             v_height = length(a_position.xyz);
 
             // compute the world position of the surface
-            vec3 surfaceWorldPosition = (u_worldMatrix * a_position).xyz;
-            
+            vec3 surfaceWorldPosition = worldPosition.xyz;
+
             // compute the vector of the surface to the light
             // and pass it to the fragment shader
             v_surfaceToLight = u_lightWorldPosition - surfaceWorldPosition;
@@ -373,6 +372,8 @@ class PlanetObject {
             // compute the vector of the surface to the view/camera
             // and pass it to the fragment shader
             v_surfaceToView = u_viewWorldPosition - surfaceWorldPosition;
+
+            v_projectedTexcoord = u_textureMatrix * worldPosition;
         }
         `;
     }
@@ -381,26 +382,42 @@ class PlanetObject {
         return `#version 300 es
         precision highp float;
 
-        in vec3 v_normal;
         in float v_height;
-
+        in vec4 v_projectedTexcoord;
+        in vec3 v_normal;
         in vec3 v_surfaceToLight;
         in vec3 v_surfaceToView;
+
+        uniform sampler2D u_projectedTexture;
 
         uniform vec3 u_lightDirection;
         uniform float u_lightInnerLimit;
         uniform float u_lightOuterLimit;
+        uniform float u_bias;
 
         uniform float u_ambientLight;
         uniform vec4 u_specularColor;
         uniform vec4 u_diffuseColor;
         uniform float u_shininess;
-        
+
         uniform vec4 u_color;
         
         out vec4 out_color;
 
         void main() {
+            // divide by w to get the correct value. See article on perspective
+            vec3 projectedTexcoord = v_projectedTexcoord.xyz / v_projectedTexcoord.w;
+            float currentDepth = projectedTexcoord.z + u_bias;
+
+            bool inRange = 
+                projectedTexcoord.x >= 0.0 &&
+                projectedTexcoord.x <= 1.0 &&
+                projectedTexcoord.y >= 0.0 &&
+                projectedTexcoord.y <= 1.0;
+
+            float projectedDepth = texture(u_projectedTexture, projectedTexcoord.xy).r;
+            float shadowLight = (inRange && projectedDepth <= currentDepth) ? 0.0 : 1.0;  
+
             // because v_normal is a varying it's interpolated
             // so it will not be a unit vector. Normalizing it
             // will make it a unit vector again
@@ -420,17 +437,14 @@ class PlanetObject {
              
             // Lets multiply just the color portion (not the alpha)
             // by the light
-            
-            vec3 base_color = u_color.rgb;
 
             vec3 diffuseColor = u_diffuseColor.rgb;
-            vec3 ambient = base_color * u_ambientLight;
-            vec3 diffuse = base_color * diffuseLight * diffuseColor;
-            vec3 specular = u_specularColor.rgb * specularLight;
+            vec3 ambient = u_color.rgb * u_ambientLight;
+            vec3 diffuse = u_color.rgb * diffuseLight * diffuseColor * shadowLight;
+            vec3 specular = u_specularColor.rgb * specularLight * shadowLight;
             vec3 finalColor = ambient + diffuse + specular;
 
             finalColor = clamp(finalColor, 0.0, 1.0);
-
             out_color = vec4(finalColor, 1.0);
         }
         `;
@@ -517,7 +531,8 @@ class Star {
             ambientLight: 0.3,
             generalShininessFactor: 1.0,
             lightLimitAngle: 30,
-            shadowLightFOV: 180
+            shadowMapBias: -0.006,
+            shadowMapTextureSize: 2048,
         };
     }
 
@@ -555,7 +570,7 @@ class Star {
         `;
     }
 
-    getStarArrays(planetRadius, treefoliageRadiusFactor, treeTrunkHeightFactor, treeScale) {
+    getStarArrays(planetRadius) {
         const starRadius = this.data.starRadiusFactor * planetRadius;
         return twgl.primitives.createSphereVertices(starRadius, 12, 12);
     }
