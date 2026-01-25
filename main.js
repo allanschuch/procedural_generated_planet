@@ -11,6 +11,8 @@ function main() {
     const stone = new Stone();
     const tree = new Tree();
 
+    // SHADERS AND PROGRAMS
+
     const programOptions = {
         attribLocations: {
             'a_position': 0,
@@ -18,7 +20,30 @@ function main() {
             'a_texcoord': 2,
             'a_color':    3,
         },
-        };
+    };
+
+    const pickingVS = `#version 300 es
+        in vec4 a_position;
+        
+        uniform mat4 u_worldMatrix;
+        uniform mat4 u_viewProjectionMatrix;
+        
+        void main() {
+            gl_Position = u_viewProjectionMatrix * u_worldMatrix * a_position;
+        }
+    `;
+
+    const pickingFS = `#version 300 es
+        precision highp float;
+        
+        uniform vec4 u_id;
+        
+        out vec4 outColor;
+        
+        void main() {
+            outColor = u_id;
+        }
+    `;
 
     const shadowMapVS =
         `#version 300 es
@@ -37,9 +62,11 @@ function main() {
         void main() {
         }
         `;
-         
+      
     const shadowMapConfig = createShadowMapFramebuffer();
+    const pickingConfig = createPickingFramebuffer();
     const shadowMapProgramInfo = twgl.createProgramInfo(gl, [shadowMapVS, shadowMapFS], programOptions);
+    const pickingProgramInfo = twgl.createProgramInfo(gl, [pickingVS, pickingFS]);
     const planetObjectProgramInfo = twgl.createProgramInfo(gl, [PlanetObject.VS, PlanetObject.FS], programOptions);
     const planetProgramInfo = twgl.createProgramInfo(gl, [Planet.VS, Planet.FS], programOptions);
     const starProgramInfo = twgl.createProgramInfo(gl, [Star.VS, Star.FS], programOptions);
@@ -93,6 +120,8 @@ function main() {
         systems: [systemNode]
     }
 
+    let pickableObjects = [];
+
     // HELPER FUNCTIONS
 
     function createShadowMapFramebuffer() {
@@ -124,7 +153,7 @@ function main() {
             0);                   // mip level
         
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        return { framebuffer: depthFramebuffer, texture: depthTexture  };
+        return { framebuffer: depthFramebuffer, texture: depthTexture };
     }
 
     function updateShadowMapSize() {
@@ -142,6 +171,67 @@ function main() {
             null);
     }
 
+    function createPickingFramebuffer() {
+        // Create a texture to render to
+        const targetTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, targetTexture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        
+        // create a depth renderbuffer
+        const depthBuffer = gl.createRenderbuffer();
+        gl.bindRenderbuffer(gl.RENDERBUFFER, depthBuffer);
+        
+        updatePickingFramebufferAttachmentSizes(gl.canvas.width, gl.canvas.height, depthBuffer, targetTexture);
+
+        // Create and bind the framebuffer
+        const fb = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+
+        // attach the texture as the first color attachment
+        const attachmentPoint = gl.COLOR_ATTACHMENT0;
+        const level = 0;
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, targetTexture, level);
+
+        // make a depth buffer and the same size as the targetTexture
+        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthBuffer);
+        
+        return { framebuffer: fb, targetTexture: targetTexture, depthBuffer: depthBuffer };
+    }
+
+    function updatePickingFramebufferAttachmentSizes(width, height, depthBuffer, targetTexture) {
+        gl.bindTexture(gl.TEXTURE_2D, targetTexture);
+        // define size and format of level 0
+        const level = 0;
+        const internalFormat = gl.RGBA;
+        const border = 0;
+        const format = gl.RGBA;
+        const type = gl.UNSIGNED_BYTE;
+        const data = null;
+        gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
+                        width, height, border,
+                        format, type, data);
+        gl.bindRenderbuffer(gl.RENDERBUFFER, depthBuffer);
+        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+    }
+
+    function readPixelIdUnderTheMouse(){
+            const pixelX = mouseX * gl.canvas.width / gl.canvas.clientWidth;
+            const pixelY = gl.canvas.height - mouseY * gl.canvas.height / gl.canvas.clientHeight - 1;
+            const data = new Uint8Array(4);
+            gl.readPixels(
+                pixelX,            // x
+                pixelY,            // y
+                1,                 // width
+                1,                 // height
+                gl.RGBA,           // format
+                gl.UNSIGNED_BYTE,  // type
+                data);             // typed array to hold result
+            const id = data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24);
+            return id;
+        }
+
     function getShadowMappingFOVAngleInRadians() {
         const lightWorldPosition = starNode.worldMatrix.slice(12, 15);
         const lightDistToPlanetCenter = twgl.v3.length(lightWorldPosition);
@@ -151,6 +241,25 @@ function main() {
         let shadowHalfFOV = Math.asin(planetRadiusWithTrees / lightDistToPlanetCenter);
         shadowHalfFOV *= 1.1;
         return shadowHalfFOV * 2;
+    }
+
+    function removeFromPickableObjectsList(startId, numberOfObjects = 1) {
+        const index = startId - 1;
+        pickableObjects.splice(index, numberOfObjects);
+        updatePickableObjectsIDs(index);
+    }
+
+    function updatePickableObjectsIDs(indexStart = 0) {
+        for (let i = indexStart; i < pickableObjects.length; i++) {
+            const objectNode = pickableObjects[i];
+            objectNode.id = i + 1;
+            objectNode.drawInfo.uniforms.u_id = [
+                ((objectNode.id >>  0) & 0xFF) / 0xFF,
+                ((objectNode.id >>  8) & 0xFF) / 0xFF,
+                ((objectNode.id >> 16) & 0xFF) / 0xFF,
+                ((objectNode.id >> 24) & 0xFF) / 0xFF,
+            ];
+        }
     }
 
     function getRandomPositionOnPlanetSurface() {
@@ -299,7 +408,6 @@ function main() {
         objects.foliageGroups.push(foliageGroupNode);
     }
 
-
     // UPDATE OBJECTS FUNCTIONS
 
     function updateStoneScale(){
@@ -324,8 +432,11 @@ function main() {
     }
 
     function updateStonesPlacement() {
-        objects.stones.forEach(stone => stone.setParent(null));
-        objects.stones = [];
+        if (objects.stones.length > 0) {
+            removeFromPickableObjectsList(objects.stones[0].id, objects.stones.length);
+            objects.stones.forEach(stone => stone.setParent(null));
+            objects.stones = [];
+        }
         
         const planetNode = objects.planets[0];
         
@@ -338,13 +449,21 @@ function main() {
             const rockAltitude = planet.getAltitude(planet.data.rockAltitude);
             const stoneOnIce = stoneAltitude > rockAltitude;
             const stoneColor = stoneOnIce ? stone.data.stoneIceColor : stone.data.stoneNormalColor;
+            pickableObjects.push(stoneNode);
+            stoneNode.id = pickableObjects.length;
             stoneNode.drawInfo = {
                 vertexArray: stoneVAO,       
                 programInfo: planetObjectProgramInfo,
                 bufferInfo: stoneBufferInfo,
                 uniforms: {
                     u_color: stoneColor,
-                    u_shininess: stoneOnIce ? stone.data.shininess : stone.data.shininess / 2
+                    u_shininess: stoneOnIce ? stone.data.shininess : stone.data.shininess / 2,
+                    u_id: [
+                        ((stoneNode.id >>  0) & 0xFF) / 0xFF,
+                        ((stoneNode.id >>  8) & 0xFF) / 0xFF,
+                        ((stoneNode.id >> 16) & 0xFF) / 0xFF,
+                        ((stoneNode.id >> 24) & 0xFF) / 0xFF,
+                    ]
                 }
             };
 
@@ -388,9 +507,7 @@ function main() {
             generateTree(treeNode, position);
 
             const rotationMatrix = getRotationMatrixFromUpToVector(position, [0,1,0]);
-
             const translationMatrix = m4.translation(position[0], position[1], position[2]);
-
             let localMatrix = m4.multiply(translationMatrix, rotationMatrix);
             const scaleFactor = tree.data.scale;
             localMatrix = m4.scale(localMatrix, scaleFactor, scaleFactor, scaleFactor);
@@ -521,10 +638,24 @@ function main() {
             });
         });
     }
-
+    
     // RENDER LOGIC
     
     updatePlanet();
+    
+    let lastTime = 0;
+    let frameCount = 0;
+
+    let mouseX = -1;
+    let mouseY = -1;
+    let oldPickNdx = -1;
+    let oldPickColor;
+
+    gl.canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouseX = e.clientX - rect.left;
+        mouseY = e.clientY - rect.top;
+    });
 
     const cameraData = { zoom: 10, fov: 45, angle: 0, height: 0, nearPlane: 0.1, farPlane: 150};
 
@@ -546,48 +677,65 @@ function main() {
         return m4.perspective(fov, aspect, cameraData.nearPlane, cameraData.farPlane);
     }
 
-    function updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix, isShadowPass = false, cameraMatrix = null, shadowMapTextureMatrix = null) {
+    function updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix, pass, cameraMatrix = null, shadowMapTextureMatrix = null) {
         const drawables = [];
-        if (isShadowPass) {
-            Object.keys(objects).filter(objectType => 
-                objectType !== 'stars').forEach(objectType => {
+        switch(pass) {
+            case 'shadowMap':
+                Object.keys(objects).filter(objectType => 
+                    objectType !== 'stars').forEach(objectType => {
+                        objects[objectType].forEach(object => {
+                            if (!object.drawInfo.programInfo) return;
+                            object.drawInfo.programInfo = shadowMapProgramInfo;
+                            object.drawInfo.uniforms.u_worldMatrix = object.worldMatrix;
+                            object.drawInfo.uniforms.u_lightViewProjectionMatrix = viewProjectionMatrix;
+                            drawables.push(object.drawInfo);
+                        });
+                    });
+                break;
+
+            case 'scene':
+                const lightWorldPosition = starNode.worldMatrix.slice(12, 15);
+                const lightDirection = twgl.v3.normalize(twgl.v3.subtract([0,0,0], lightWorldPosition));
+                const lightInnerLimitAngleCos = Math.cos(getAngleInRadians(star.data.lightLimitAngle));
+                const lightOuterLimitAngleCos = Math.cos(getAngleInRadians(star.data.lightLimitAngle + 15));
+
+                Object.keys(objects).forEach(objectType => {
                     objects[objectType].forEach(object => {
                         if (!object.drawInfo.programInfo) return;
-                        object.drawInfo.programInfo = shadowMapProgramInfo;
+                        object.drawInfo.programInfo = objectType === 'stars' ? starProgramInfo :
+                            objectType === 'planets' ? planetProgramInfo :
+                            planetObjectProgramInfo;
                         object.drawInfo.uniforms.u_worldMatrix = object.worldMatrix;
-                        object.drawInfo.uniforms.u_lightViewProjectionMatrix = viewProjectionMatrix;
+                        object.drawInfo.uniforms.u_viewProjectionMatrix = viewProjectionMatrix;
+                        object.drawInfo.uniforms.u_inverseTransposedWorldMatrix = m4.transpose(m4.inverse(object.worldMatrix));
+                        object.drawInfo.uniforms.u_lightDirection = lightDirection;
+                        object.drawInfo.uniforms.u_lightInnerLimit = lightInnerLimitAngleCos;
+                        object.drawInfo.uniforms.u_lightOuterLimit = lightOuterLimitAngleCos;
+                        object.drawInfo.uniforms.u_lightWorldPosition = lightWorldPosition;
+                        object.drawInfo.uniforms.u_viewWorldPosition = cameraMatrix.slice(12, 15);
+                        object.drawInfo.uniforms.u_ambientLight = star.data.ambientLight;
+                        object.drawInfo.uniforms.u_specularColor = star.data.color;
+                        object.drawInfo.uniforms.u_diffuseColor = star.data.color;
+                        object.drawInfo.uniforms.u_projectedTexture = shadowMapConfig.texture;
+                        object.drawInfo.uniforms.u_textureMatrix = shadowMapTextureMatrix;
+                        object.drawInfo.uniforms.u_bias = star.data.shadowMapBias;
                         drawables.push(object.drawInfo);
                     });
                 });
-        } else {
-            const lightWorldPosition = starNode.worldMatrix.slice(12, 15);
-            const lightDirection = twgl.v3.normalize(twgl.v3.subtract([0,0,0], lightWorldPosition));
-            const lightInnerLimitAngleCos = Math.cos(getAngleInRadians(star.data.lightLimitAngle));
-            const lightOuterLimitAngleCos = Math.cos(getAngleInRadians(star.data.lightLimitAngle + 15));
+                break;
 
-            Object.keys(objects).forEach(objectType => {
-                objects[objectType].forEach(object => {
-                    if (!object.drawInfo.programInfo) return;
-                    object.drawInfo.programInfo = objectType === 'stars' ? starProgramInfo :
-                        objectType === 'planets' ? planetProgramInfo :
-                        planetObjectProgramInfo;
-                    object.drawInfo.uniforms.u_worldMatrix = object.worldMatrix;
-                    object.drawInfo.uniforms.u_viewProjectionMatrix = viewProjectionMatrix;
-                    object.drawInfo.uniforms.u_inverseTransposedWorldMatrix = m4.transpose(m4.inverse(object.worldMatrix));
-                    object.drawInfo.uniforms.u_lightDirection = lightDirection;
-                    object.drawInfo.uniforms.u_lightInnerLimit = lightInnerLimitAngleCos;
-                    object.drawInfo.uniforms.u_lightOuterLimit = lightOuterLimitAngleCos;
-                    object.drawInfo.uniforms.u_lightWorldPosition = lightWorldPosition;
-                    object.drawInfo.uniforms.u_viewWorldPosition = cameraMatrix.slice(12, 15);
-                    object.drawInfo.uniforms.u_ambientLight = star.data.ambientLight;
-                    object.drawInfo.uniforms.u_specularColor = star.data.color;
-                    object.drawInfo.uniforms.u_diffuseColor = star.data.color;
-                    object.drawInfo.uniforms.u_projectedTexture = shadowMapConfig.texture;
-                    object.drawInfo.uniforms.u_textureMatrix = shadowMapTextureMatrix;
-                    object.drawInfo.uniforms.u_bias = star.data.shadowMapBias;
-                    drawables.push(object.drawInfo);
+            case 'picking':
+                Object.keys(objects).forEach(objectType => {
+                    objects[objectType].forEach(object => {
+                        if (!object.drawInfo.programInfo) return;
+                        if (objectType === 'stars' || objectType === 'planets') return;
+                        object.drawInfo.programInfo = pickingProgramInfo;
+                        object.drawInfo.uniforms.u_worldMatrix = object.worldMatrix;
+                        object.drawInfo.uniforms.u_viewProjectionMatrix = viewProjectionMatrix;
+                        drawables.push(object.drawInfo);
+                    });
                 });
-            });
+                break;
         }
 
         return drawables;
@@ -615,8 +763,6 @@ function main() {
         });
     }
 
-    let lastTime = 0;
-
     function getDeltaTime(currentTime) {
         const deltaTime = currentTime - lastTime;
         lastTime = currentTime;
@@ -625,7 +771,10 @@ function main() {
 
     function drawScene(time) {
         time *= 0.001;
-        twgl.resizeCanvasToDisplaySize(gl.canvas);
+        ++frameCount;
+        if (twgl.resizeCanvasToDisplaySize(gl.canvas)) {
+            updatePickingFramebufferAttachmentSizes(gl.canvas.width, gl.canvas.height, pickingConfig.depthBuffer, pickingConfig.targetTexture);
+        }
         gl.enable(gl.CULL_FACE);
         gl.enable(gl.DEPTH_TEST);
 
@@ -656,8 +805,41 @@ function main() {
         gl.viewport(0, 0, star.data.shadowMapTextureSize, star.data.shadowMapTextureSize);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        const objectsToDrawShadowMap = updateObjectsMatricesAndGetObjectsToDraw(lightViewProjectionMatrix, true);
+        const objectsToDrawShadowMap = updateObjectsMatricesAndGetObjectsToDraw(lightViewProjectionMatrix, 'shadowMap');
         twgl.drawObjectList(gl, objectsToDrawShadowMap);
+        
+        // PICKING PASS
+        
+        const projectionMatrix = setProjectionMatrix();
+        const cameraMatrix = setCameraMatrix();
+        const viewMatrix = m4.inverse(cameraMatrix);
+        const viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
+        
+        gl.bindFramebuffer(gl.FRAMEBUFFER, pickingConfig.framebuffer);
+        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        const objectsToDrawPicking = updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix, 'picking', cameraMatrix);
+        twgl.drawObjectList(gl, objectsToDrawPicking);
+
+        // ------ Figure out what pixel is under the mouse and read it
+        const objectID = readPixelIdUnderTheMouse();
+
+        // restore the object's color
+        if (oldPickNdx >= 0 && pickableObjects[oldPickNdx]) {
+            pickableObjects[oldPickNdx].drawInfo.uniforms.u_color = oldPickColor;
+            oldPickNdx = -1;
+        }
+
+        // highlight object under mouse
+        if (objectID > 0) {
+            const pickNdx = objectID - 1;
+            if (pickableObjects[pickNdx]) {
+                oldPickNdx = pickNdx;
+                oldPickColor = pickableObjects[pickNdx].drawInfo.uniforms.u_color;
+                pickableObjects[pickNdx].drawInfo.uniforms.u_color = (frameCount & 0x8) ? [1, 0, 0, 1] : [1, 1, 0, 1];
+            }
+        }
 
         // SCENE RENDER PASS
 
@@ -665,15 +847,11 @@ function main() {
         gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        const projectionMatrix = setProjectionMatrix();
-        const cameraMatrix = setCameraMatrix();
-        const viewMatrix = m4.inverse(cameraMatrix);
-        const viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
 
-        const objectsToDraw = updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix, false, cameraMatrix, shadowMapTextureMatrix);
+        const objectsToDraw = updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix, 'scene', cameraMatrix, shadowMapTextureMatrix);
     
         twgl.drawObjectList(gl, objectsToDraw);
-        
+
         requestAnimationFrame(drawScene);
 }
 

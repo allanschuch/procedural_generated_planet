@@ -11,7 +11,8 @@ class Node {
             programInfo: null,
             bufferInfo: null,
             vertexArray: null,
-        }; 
+        };
+        this.id = null; 
     }
 
     setParent(parent) {
