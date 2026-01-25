@@ -325,6 +325,43 @@ function main() {
         return degrees * Math.PI / 180;
     }
 
+    function removeStoneObject(stoneNode) {
+        stoneNode.setParent(null);
+        const stoneIndex = objects.stones.indexOf(stoneNode);
+        if (stoneIndex >= 0) objects.stones.splice(stoneIndex, 1);
+        stone.data.numberOf--;
+    }
+
+    function removeTreeObject(treeNode) {
+        const trunkNode = treeNode.children[0];
+        const trunkIndex = objects.trunks.indexOf(trunkNode);
+        if (trunkIndex >= 0) objects.trunks.splice(trunkIndex, 1);
+        
+        const foliageGroupNode = treeNode.children[1];
+        foliageGroupNode.children.forEach(foliageNode => {
+            const foliageIndex = objects.foliages.indexOf(foliageNode);
+            if (foliageIndex >= 0) objects.foliages.splice(foliageIndex, 1);
+        });
+        
+        foliageGroupNode.children.forEach(foliageNode => foliageNode.setParent(null));
+        foliageGroupNode.setParent(null);
+        trunkNode.setParent(null);
+
+        const treeIndex = objects.trees.indexOf(treeNode);
+        if (treeIndex >= 0) objects.trees.splice(treeIndex, 1);
+        treeNode.setParent(null);
+
+        tree.data.numberOf--;
+    }
+
+    function removeObject(objectID) {
+        const objectIndex = objectID - 1;
+        const objectNode = pickableObjects[objectIndex];
+        if (objects.stones.includes(objectNode)) removeStoneObject(objectNode);
+        if (objects.trees.includes(objectNode)) removeTreeObject(objectNode);
+        removeFromPickableObjectsList(objectID);
+    }
+
     // CREATE OBJECTS FUNCTIONS
 
     function createFoliageGroup(foliageGroupNode, foliageColor, treeID) {
@@ -663,6 +700,8 @@ function main() {
     let lastTime = 0;
     let frameCount = 0;
 
+    let pointedObjectID = -1;
+
     let mouseX = -1;
     let mouseY = -1;
     let oldPickNdx = -1;
@@ -674,6 +713,14 @@ function main() {
         const rect = canvas.getBoundingClientRect();
         mouseX = e.clientX - rect.left;
         mouseY = e.clientY - rect.top;
+    });
+
+    gl.canvas.addEventListener('click', () => {
+        if (pointedObjectID > 0) {
+            removeObject(pointedObjectID);            
+            pointedObjectID = 0;
+            oldPickNdx = -1; 
+        }
     });
 
     const cameraData = { zoom: 10, fov: 45, angle: 0, height: 0, nearPlane: 0.1, farPlane: 150};
@@ -699,8 +746,7 @@ function main() {
     function restoreOldPickedObjectColor() {
         const oldPickObject = pickableObjects[oldPickNdx];
         if (oldPickNdx >= 0 && oldPickObject) {
-            const isTree = oldPickObject.children.length === 2;
-            if (isTree){
+            if (objects.trees.includes(oldPickObject)) {
                 console.log('restoring tree color');
                 const trunk = oldPickObject.children[0];
                 const foliageGroup = oldPickObject.children[1];
@@ -720,8 +766,7 @@ function main() {
             const pickNdx = objectID - 1;
             const pickObject = pickableObjects[pickNdx];
             if (pickObject) {
-                const isTree = pickObject.children.length === 2;
-                if (isTree){
+                if (objects.trees.includes(pickObject)) {
                     const trunk = pickObject.children[0];
                     const foliageGroup = pickObject.children[1];
                     oldPickNdx = pickNdx;
@@ -886,13 +931,13 @@ function main() {
         twgl.drawObjectList(gl, objectsToDrawPicking);
 
         // ------ Figure out what pixel is under the mouse and read it
-        const objectID = readPixelIdUnderTheMouse();
+        pointedObjectID = readPixelIdUnderTheMouse();
 
         // restore the object's color
         restoreOldPickedObjectColor();
 
         // highlight object under mouse
-        highlightPickedObject(objectID);
+        highlightPickedObject(pointedObjectID);
 
         // SCENE RENDER PASS
 
