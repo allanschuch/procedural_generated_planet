@@ -327,7 +327,7 @@ function main() {
 
     // CREATE OBJECTS FUNCTIONS
 
-    function createFoliageGroup(foliageGroupNode, foliageColor) {
+    function createFoliageGroup(foliageGroupNode, foliageColor, treeID) {
         for (let i = 0; i < 5; i++) {
             const foliageNode = new Node();
             foliageNode.setParent(foliageGroupNode);
@@ -337,7 +337,13 @@ function main() {
                 bufferInfo: foliageBufferInfo,
                 uniforms: {
                     u_color: foliageColor,
-                    u_shininess: tree.data.shininess * star.data.generalShininessFactor
+                    u_shininess: tree.data.shininess * star.data.generalShininessFactor,
+                    u_id: [
+                        ((treeID >>  0) & 0xFF) / 0xFF,
+                        ((treeID >>  8) & 0xFF) / 0xFF,
+                        ((treeID >> 16) & 0xFF) / 0xFF,
+                        ((treeID >> 24) & 0xFF) / 0xFF,
+                    ]
                 }
             };
 
@@ -365,7 +371,7 @@ function main() {
         }
     }
 
-    function generateTree(treeNode, position){
+    function generateTree(treeNode, position, treeID){
         const treeAltitude = twgl.v3.length(position);
         const rockAltitude = planet.getAltitude(planet.data.rockAltitude);
         let foliageColor;
@@ -389,7 +395,13 @@ function main() {
             bufferInfo: trunkBufferInfo,
             uniforms: {
                 u_color: tree.data.trunkColor,
-                u_shininess: tree.data.shininess
+                u_shininess: tree.data.shininess,
+                u_id: [
+                    ((treeID >>  0) & 0xFF) / 0xFF,
+                    ((treeID >>  8) & 0xFF) / 0xFF,
+                    ((treeID >> 16) & 0xFF) / 0xFF,
+                    ((treeID >> 24) & 0xFF) / 0xFF,
+                ]
             },
         };
 
@@ -399,7 +411,7 @@ function main() {
 
         const foliageGroupNode = new Node();
         foliageGroupNode.setParent(treeNode);
-        createFoliageGroup(foliageGroupNode, foliageColor);
+        createFoliageGroup(foliageGroupNode, foliageColor, treeID);
 
         foliageGroupNode.localMatrix = m4.translation(0, tree.data.trunkHeight * 1.5, 0);
 
@@ -482,20 +494,23 @@ function main() {
     }
 
     function updateTreesPlacement() {
-        objects.trees.forEach(tree => {
-            tree.children.forEach(child => {
-                child.children.forEach(grandChild => {
-                    grandChild.setParent(null);
+        if (objects.trees.length > 0) {
+            removeFromPickableObjectsList(objects.trees[0].id, objects.trees.length);
+            objects.trees.forEach(tree => {
+                tree.children.forEach(child => {
+                    child.children.forEach(grandChild => {
+                        grandChild.setParent(null);
+                    });
+                    child.setParent(null);
                 });
-                child.setParent(null);
+                tree.setParent(null);
             });
-            tree.setParent(null);
-        });
 
-        objects.trees = [];
-        objects.trunks = [];
-        objects.foliages = [];
-        objects.foliageGroups = [];
+            objects.trees = [];
+            objects.trunks = [];
+            objects.foliages = [];
+            objects.foliageGroups = [];
+        }
 
         const planetNode = objects.planets[0];
         
@@ -504,7 +519,9 @@ function main() {
         objects.trees = treePositions.map(position => {
             const treeNode = new Node();
             treeNode.setParent(planetNode);
-            generateTree(treeNode, position);
+            pickableObjects.push(treeNode);
+            treeNode.id = pickableObjects.length;
+            generateTree(treeNode, position, treeNode.id);
 
             const rotationMatrix = getRotationMatrixFromUpToVector(position, [0,1,0]);
             const translationMatrix = m4.translation(position[0], position[1], position[2]);
@@ -649,7 +666,9 @@ function main() {
     let mouseX = -1;
     let mouseY = -1;
     let oldPickNdx = -1;
-    let oldPickColor;
+    let oldPickColor = {stone: null, trunk: null, foliage: null};
+    const redHighlight = [1, 0, 0, 1];
+    const yellowHighlight = [1, 1, 0, 1];
 
     gl.canvas.addEventListener('mousemove', (e) => {
         const rect = canvas.getBoundingClientRect();
@@ -675,6 +694,50 @@ function main() {
         const fov = getAngleInRadians(cameraData.fov);
         const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
         return m4.perspective(fov, aspect, cameraData.nearPlane, cameraData.farPlane);
+    }
+
+    function restoreOldPickedObjectColor() {
+        const oldPickObject = pickableObjects[oldPickNdx];
+        if (oldPickNdx >= 0 && oldPickObject) {
+            const isTree = oldPickObject.children.length === 2;
+            if (isTree){
+                console.log('restoring tree color');
+                const trunk = oldPickObject.children[0];
+                const foliageGroup = oldPickObject.children[1];
+                trunk.drawInfo.uniforms.u_color = oldPickColor.trunk;
+                foliageGroup.children.forEach(foliage => {
+                    foliage.drawInfo.uniforms.u_color = oldPickColor.foliage;
+                });
+            } else {
+                oldPickObject.drawInfo.uniforms.u_color = oldPickColor.stone;
+            }
+            oldPickNdx = -1;
+        }
+    }
+
+    function highlightPickedObject(objectID) {
+        if (objectID > 0) {
+            const pickNdx = objectID - 1;
+            const pickObject = pickableObjects[pickNdx];
+            if (pickObject) {
+                const isTree = pickObject.children.length === 2;
+                if (isTree){
+                    const trunk = pickObject.children[0];
+                    const foliageGroup = pickObject.children[1];
+                    oldPickNdx = pickNdx;
+                    oldPickColor.trunk = trunk.drawInfo.uniforms.u_color;
+                    oldPickColor.foliage = foliageGroup.children[0].drawInfo.uniforms.u_color;
+                    trunk.drawInfo.uniforms.u_color = (frameCount & 0x8) ? redHighlight : yellowHighlight;
+                    foliageGroup.children.forEach(foliage => {
+                        foliage.drawInfo.uniforms.u_color = (frameCount & 0x8) ? redHighlight : yellowHighlight;
+                    });
+                } else {
+                    oldPickNdx = pickNdx;
+                    oldPickColor.stone = pickObject.drawInfo.uniforms.u_color;
+                    pickObject.drawInfo.uniforms.u_color = (frameCount & 0x8) ? redHighlight : yellowHighlight;
+                }
+            }
+        }
     }
 
     function updateObjectsMatricesAndGetObjectsToDraw(viewProjectionMatrix, pass, cameraMatrix = null, shadowMapTextureMatrix = null) {
@@ -814,7 +877,7 @@ function main() {
         const cameraMatrix = setCameraMatrix();
         const viewMatrix = m4.inverse(cameraMatrix);
         const viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
-        
+
         gl.bindFramebuffer(gl.FRAMEBUFFER, pickingConfig.framebuffer);
         gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -826,20 +889,10 @@ function main() {
         const objectID = readPixelIdUnderTheMouse();
 
         // restore the object's color
-        if (oldPickNdx >= 0 && pickableObjects[oldPickNdx]) {
-            pickableObjects[oldPickNdx].drawInfo.uniforms.u_color = oldPickColor;
-            oldPickNdx = -1;
-        }
+        restoreOldPickedObjectColor();
 
         // highlight object under mouse
-        if (objectID > 0) {
-            const pickNdx = objectID - 1;
-            if (pickableObjects[pickNdx]) {
-                oldPickNdx = pickNdx;
-                oldPickColor = pickableObjects[pickNdx].drawInfo.uniforms.u_color;
-                pickableObjects[pickNdx].drawInfo.uniforms.u_color = (frameCount & 0x8) ? [1, 0, 0, 1] : [1, 1, 0, 1];
-            }
-        }
+        highlightPickedObject(objectID);
 
         // SCENE RENDER PASS
 
