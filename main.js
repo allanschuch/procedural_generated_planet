@@ -734,7 +734,7 @@ function main() {
         }
     });
 
-    const cameraData = { zoom: 20, fov: 45, angle: 0, height: 0, nearPlane: 0.1, farPlane: 150};
+    const cameraData = { zoom: 18, fov: 45, angle: 0, height: 0, nearPlane: 0.1, farPlane: 150};
 
     function setCameraMatrix() {
         const cameraRadius = 1/cameraData.zoom * 100;
