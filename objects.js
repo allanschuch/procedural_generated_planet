@@ -193,6 +193,41 @@ class Planet {
         return this.lerp(this.planetMinAltitude, this.planetMaxAltitude, altitudeFactor);
     }
 
+    updateNormals() {
+        const positons = this.planetArrays.position;
+        const indices = this.planetArrays.indices;
+
+        const normals = new Array(positons.length).fill(0);
+        for (let i = 0; i < indices.length; i += 3) {
+            const index0 = indices[i] * 3;
+            const index1 = indices[i + 1] * 3;
+            const index2 = indices[i + 2] * 3;
+            const v0 = [positons[index0], positons[index0 + 1], positons[index0 + 2]];
+            const v1 = [positons[index1], positons[index1 + 1], positons[index1 + 2]];
+            const v2 = [positons[index2], positons[index2 + 1], positons[index2 + 2]];
+            const edge1 = twgl.v3.subtract(v1, v0);
+            const edge2 = twgl.v3.subtract(v2, v0);
+            const faceNormal = twgl.v3.normalize(twgl.v3.cross(edge1, edge2));
+            normals[index0] += faceNormal[0];
+            normals[index0 + 1] += faceNormal[1];
+            normals[index0 + 2] += faceNormal[2];
+            normals[index1] += faceNormal[0];
+            normals[index1 + 1] += faceNormal[1];
+            normals[index1 + 2] += faceNormal[2];
+            normals[index2] += faceNormal[0];
+            normals[index2 + 1] += faceNormal[1];
+            normals[index2 + 2] += faceNormal[2];
+        }
+        for (let i = 0; i < normals.length; i += 3) {
+            const normal = [normals[i], normals[i + 1], normals[i + 2]];
+            const normalizedNormal = twgl.v3.normalize(normal);
+            normals[i] = normalizedNormal[0];
+            normals[i + 1] = normalizedNormal[1];
+            normals[i + 2] = normalizedNormal[2];
+        }
+        this.planetArrays.normal = normals;
+    }
+
     update() {
         // const curvePoints = this.getSpherePoints(this.data.resolution);
         this.updateMinMaxAltitude();
@@ -200,6 +235,8 @@ class Planet {
         this.planetArrays = twgl.primitives.createSphereVertices(this.data.radius, this.data.divisions, this.data.resolution);
         
         this.planetArrays.position = this.applyNoiseToSphere(this.planetArrays.position, this.data.numberOfNoiseOctaves, this.data.noiseFrequency, this.data.noisePersistence);
+
+        this.updateNormals();
 
         this.updateUniforms();
     }
