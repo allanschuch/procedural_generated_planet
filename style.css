@@ -1,31 +1,51 @@
-/* 1. Configuração Global da Página */
 body {
     margin: 0;
     overflow: hidden;
     background-color: #000;
     color: white;
     font-family: monospace;
-}
-
-canvas {
-    display: block;
+    
+    display: flex;       
+    flex-direction: row; 
     width: 100vw;
     height: 100vh;
 }
 
+canvas {
+    display: block;
+    flex-grow: 1;
+    height: 100vh;
+    z-index: 1;
+}
+
+
 #uiContainer {
-    position: absolute;
-    top: 10px;
-    right: 10px;
+    position: relative;
     z-index: 2;
+
+    width: 300px;     
+    min-width: 300px; 
+    height: 100vh;
+
     display: flex;
-    align-items: flex-start;
+    flex-direction: column; 
     gap: 10px;
-    width: 550px; 
-    max-height: 100vh;
-    transform: scale(0.85);
-    transform-origin: top right;
-    pointer-events: none;
+    padding: 10px; 
+    box-sizing: border-box; 
+
+    background-color: #1a1a1a;
+    border-left: 2px solid #333; 
+    
+    opacity: 1; 
+    transform: none; 
+    pointer-events: auto; 
+    transition: none !important;
+    
+    overflow-y: auto;
+}
+
+body:has(.ui-hidden) #uiToggle {
+    right: 10px;
 }
 
 .ui-col {
