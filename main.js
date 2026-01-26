@@ -252,13 +252,24 @@ function main() {
     function updatePickableObjectsIDs(indexStart = 0) {
         for (let i = indexStart; i < pickableObjects.length; i++) {
             const objectNode = pickableObjects[i];
-            objectNode.id = i + 1;
-            objectNode.drawInfo.uniforms.u_id = [
-                ((objectNode.id >>  0) & 0xFF) / 0xFF,
-                ((objectNode.id >>  8) & 0xFF) / 0xFF,
-                ((objectNode.id >> 16) & 0xFF) / 0xFF,
-                ((objectNode.id >> 24) & 0xFF) / 0xFF,
+            const newID = i + 1;
+            objectNode.id = newID;
+            const idColor = [
+                ((newID >>  0) & 0xFF) / 0xFF,
+                ((newID >>  8) & 0xFF) / 0xFF,
+                ((newID >> 16) & 0xFF) / 0xFF,
+                ((newID >> 24) & 0xFF) / 0xFF,
             ];
+            if (objects.trees.includes(objectNode)) {
+                const trunkNode = objectNode.children[0];
+                trunkNode.drawInfo.uniforms.u_id = idColor;
+                const foliageGroupNode = objectNode.children[1];
+                foliageGroupNode.children.forEach(foliageNode => {
+                    foliageNode.drawInfo.uniforms.u_id = idColor;
+                });
+            } else if (objects.stones.includes(objectNode)) {
+                objectNode.drawInfo.uniforms.u_id = idColor;
+            }
         }
     }
 
@@ -357,9 +368,9 @@ function main() {
     function removeObject(objectID) {
         const objectIndex = objectID - 1;
         const objectNode = pickableObjects[objectIndex];
+        removeFromPickableObjectsList(objectID);
         if (objects.stones.includes(objectNode)) removeStoneObject(objectNode);
         if (objects.trees.includes(objectNode)) removeTreeObject(objectNode);
-        removeFromPickableObjectsList(objectID);
     }
 
     // CREATE OBJECTS FUNCTIONS
