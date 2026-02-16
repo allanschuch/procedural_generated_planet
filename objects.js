@@ -229,7 +229,6 @@ class Planet {
     }
 
     update() {
-        // const curvePoints = this.getSpherePoints(this.data.resolution);
         this.updateMinMaxAltitude();
 
         this.planetArrays = twgl.primitives.createSphereVertices(this.data.radius, this.data.divisions, this.data.resolution);
@@ -257,82 +256,6 @@ class Planet {
             u_colorSnow: this.data.snowColor,
         };
     }
-
-    // getSpherePoints(numPoints) {
-    //     const points = [];
-    //     for (let i = 0; i < numPoints; i++) {
-    //         const t = i / (numPoints - 1);
-    //         const angle = (Math.PI / 2) - (t * Math.PI); 
-    //         const x = Math.cos(angle) * this.data.radius;
-    //         const y = Math.sin(angle) * this.data.radius;
-    //         points.push([x, y]);
-    //     }
-    //     return points;
-    // }
-
-    // lathePoints(points, startAngle, endAngle, numDivisions, capStart, capEnd) {     
-    //     const positions = [];
-    //     // const texcoords = [];
-    //     const normals = [];
-    //     const indices = [];
-
-    //     const vOffset = capStart ? 1 : 0;
-    //     const pointsPerColumn = points.length + vOffset + (capEnd ? 1 : 0);
-    //     const quadsDown = pointsPerColumn - 1;
-
-    //     for (let division = 0; division <= numDivisions; ++division) {
-    //         const u = division / numDivisions;
-    //         const angle = this.lerp(startAngle, endAngle, u);
-    //         const mat = m4.yRotation(angle);
-
-    //         if (capStart) {
-    //             const p = [0, points[0][1], 0];
-    //             const tp = m4.transformPoint(mat, p); 
-    //             positions.push(tp[0], tp[1], tp[2]);
-    //             // texcoords.push(u, 0);
-
-    //             const normal = twgl.v3.normalize(tp);
-    //             normals.push(normal[0], normal[1], normal[2]);
-    //         }
-
-    //         points.forEach((p, ndx) => {
-    //             const tp = m4.transformPoint(mat, [...p, 0]);
-    //             positions.push(tp[0], tp[1], tp[2]);
-                
-    //             // const v = (ndx + vOffset) / quadsDown;
-    //             // texcoords.push(u, v);
-
-    //             const normal = twgl.v3.normalize(tp);
-    //             normals.push(normal[0], normal[1], normal[2]);
-    //         });
-
-    //         if (capEnd) {
-    //             const p = [0, points[points.length - 1][1], 0];
-    //             const tp = m4.transformPoint(mat, p);
-    //             positions.push(tp[0], tp[1], tp[2]);
-    //             // texcoords.push(u, 1);
-
-    //             const normal = twgl.v3.normalize(tp);
-    //             normals.push(normal[0], normal[1], normal[2]);
-    //         }
-    //     }
-
-    //     for (let division = 0; division < numDivisions; ++division) {
-    //         const column1Offset = division * pointsPerColumn;
-    //         const column2Offset = column1Offset + pointsPerColumn;
-    //         for (let quad = 0; quad < quadsDown; ++quad) {
-    //             indices.push(column1Offset + quad, column1Offset + quad + 1, column2Offset + quad);
-    //             indices.push(column1Offset + quad + 1, column2Offset + quad + 1, column2Offset + quad);
-    //         }
-    //     }
-
-    //     return {
-    //     position: positions,
-    //     // texcoord: texcoords,
-    //     normal: normals,
-    //     indices: indices,
-    //     };
-    // }
 
     applyNoiseToSphere(positions, octaves = 1, frequency = 1.0, persistence = 0.5) {
         for (let i = 0; i < positions.length; i = i + 3) {
